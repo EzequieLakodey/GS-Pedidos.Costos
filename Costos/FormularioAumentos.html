@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary: #059669;
+            --primary-dark: #047857;
+            --primary-light: #34d399;
+            --accent: #0f766e;
+            --amber: #d97706;
+            --amber-light: #fef3c7;
+            --surface: #ffffff;
+            --surface-2: #f8fafc;
+            --surface-3: #f1f5f9;
+            --border: #e2e8f0;
+            --text: #0f172a;
+            --text-2: #475569;
+            --text-3: #94a3b8;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 8px 24px rgba(5,150,105,0.05);
+            --transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0fdf4 0%, #f8fafc 60%, #fffbeb 100%);
+            padding: 20px;
+            color: var(--text);
+            font-size: 13.5px;
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .page-wrapper { max-width: 420px; margin: 0 auto; }
+
+        /* Header */
+        .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+        .page-header .icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, var(--amber), #b45309);
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            font-size: 20px; box-shadow: 0 4px 14px rgba(217,119,6,0.3); flex-shrink: 0;
+        }
+        .page-header h1 { font-size: 1.15rem; font-weight: 700; line-height: 1.2; }
+        .page-header p  { font-size: 0.78rem; color: var(--text-2); margin-top: 2px; }
+
+        /* Card */
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); box-shadow: var(--shadow);
+            padding: 22px; overflow: hidden;
+        }
+
+        /* Loading state */
+        .loading-state {
+            display: flex; flex-direction: column; align-items: center;
+            padding: 24px 0; gap: 12px; color: var(--text-3);
+        }
+        .spinner {
+            width: 28px; height: 28px; border-radius: 50%;
+            border: 3px solid #d1fae5; border-top-color: var(--primary);
+            animation: spin 0.75s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-state span { font-size: 0.85rem; font-style: italic; }
+
+        /* Form */
+        .form-body { display: none; }
+        .field-group { margin-bottom: 16px; }
+        label {
+            display: block; font-size: 0.77rem; font-weight: 700;
+            color: var(--text-2); margin-bottom: 5px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .select-wrapper { position: relative; }
+        .select-wrapper::after {
+            content: '▾'; position: absolute; right: 11px; top: 50%;
+            transform: translateY(-50%); color: var(--text-3);
+            pointer-events: none; font-size: 11px;
+        }
+        select, input[type="text"], input[type="number"] {
+            width: 100%; padding: 10px 13px; border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm); font-family: 'Inter', sans-serif;
+            font-size: 13.5px; color: var(--text); background: var(--surface);
+            transition: var(--transition); outline: none;
+            appearance: none; -webkit-appearance: none;
+        }
+        select { padding-right: 32px; }
+        input:focus, select:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(52,211,153,0.18);
+        }
+        input::placeholder { color: var(--text-3); }
+
+        /* Percentage input with suffix */
+        .pct-wrapper { position: relative; }
+        .pct-wrapper input { padding-right: 36px; }
+        .pct-suffix {
+            position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+            font-size: 14px; font-weight: 700; color: var(--amber); pointer-events: none;
+        }
+
+        /* Preview banner */
+        .preview-banner {
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            border: 1.5px solid #fde68a; border-radius: var(--radius-sm);
+            padding: 10px 14px; margin-bottom: 18px;
+            display: none; align-items: center; gap: 10px;
+        }
+        .preview-banner .icon { font-size: 18px; flex-shrink: 0; }
+        .preview-banner .text { font-size: 0.82rem; color: #92400e; font-weight: 600; }
+        .preview-banner .text strong { color: #78350f; }
+
+        /* Divider */
+        .divider { height: 1px; background: var(--border); margin: 18px 0; }
+
+        /* Buttons */
+        .btn {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            width: 100%; padding: 12px; border-radius: var(--radius-sm); border: none;
+            font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 700;
+            cursor: pointer; transition: var(--transition); outline: none;
+            letter-spacing: 0.2px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--amber), #b45309);
+            color: white; box-shadow: 0 4px 14px rgba(217,119,6,0.3);
+        }
+        .btn-primary:hover:not(:disabled) { box-shadow: 0 6px 22px rgba(217,119,6,0.45); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        /* Result alert */
+        .result-alert {
+            border-radius: var(--radius-sm); padding: 12px 14px;
+            font-size: 0.85rem; font-weight: 600; margin-top: 14px;
+            display: none; align-items: center; gap: 8px;
+        }
+        .result-alert.success { background: #d1fae5; border: 1.5px solid #6ee7b7; color: #065f46; }
+        .result-alert.error   { background: #fee2e2; border: 1.5px solid #fca5a5; color: #991b1b; }
+    </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+    <!-- Header -->
+    <div class="page-header">
+        <div class="icon">📈</div>
+        <div>
+            <h1>Aumento Masivo de Materiales</h1>
+            <p>Aplica un porcentaje de aumento por proveedor o categoría</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <!-- Loading -->
+        <div class="loading-state" id="loading-state">
+            <div class="spinner"></div>
+            <span>Cargando proveedores y categorías...</span>
+        </div>
+
+        <!-- Form -->
+        <div class="form-body" id="form-body">
+
+            <!-- Preview -->
+            <div class="preview-banner" id="preview-banner">
+                <span class="icon">⚠️</span>
+                <div class="text" id="preview-text">—</div>
+            </div>
+
+            <div class="field-group">
+                <label>🏭 Proveedor</label>
+                <div class="select-wrapper">
+                    <select id="proveedor" onchange="filtrarCategorias(); actualizarPreview();">
+                        <option value="TODOS">📋 Todos los proveedores</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="field-group">
+                <label>📌 Categoría</label>
+                <div class="select-wrapper">
+                    <select id="categoria" onchange="filtrarProveedores(); actualizarPreview();">
+                        <option value="TODAS">📋 Todas las categorías</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="field-group">
+                <label>📈 Porcentaje de Aumento</label>
+                <div class="pct-wrapper">
+                    <input type="number" id="porcentaje" placeholder="Ej: 10 o 3.5" step="0.1" min="0" oninput="actualizarPreview()">
+                    <span class="pct-suffix">%</span>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" id="btn-aplicar" onclick="ejecutarAumento()">
+                ✅ Aplicar Aumento
+            </button>
+
+            <div class="result-alert" id="result-alert"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let datosGlobales = {};
+
+    window.onload = function () {
+        google.script.run
+            .withSuccessHandler(inicializar)
+            .withFailureHandler(err => {
+                document.getElementById('loading-state').innerHTML =
+                    `<div style="color:#991b1b;font-size:13px;font-weight:500;">⚠️ Error al cargar: ${err.message}</div>`;
+            })
+            .obtenerDatosParaAumentos();
+    };
+
+    function inicializar(res) {
+        datosGlobales = res;
+
+        reconstruirSelect('proveedor', datosGlobales.proveedores, 'Todos los proveedores', 'TODOS');
+        reconstruirSelect('categoria', datosGlobales.categorias, 'Todas las categorías', 'TODAS');
+
+        document.getElementById('loading-state').style.display = 'none';
+        document.getElementById('form-body').style.display = 'block';
+    }
+
+    function filtrarCategorias() {
+        const prov = document.getElementById('proveedor').value;
+        const catActual = document.getElementById('categoria').value;
+        if (prov === 'TODOS') {
+            reconstruirSelect('categoria', datosGlobales.categorias, 'Todas las categorías', 'TODAS');
+        } else {
+            const filtradas = datosGlobales.relacionPC[prov] || [];
+            reconstruirSelect('categoria', filtradas, 'Todas las categorías de este proveedor', 'TODAS');
+        }
+        const opts = Array.from(document.getElementById('categoria').options);
+        if (opts.some(o => o.value === catActual)) document.getElementById('categoria').value = catActual;
+    }
+
+    function filtrarProveedores() {
+        const cat = document.getElementById('categoria').value;
+        const provActual = document.getElementById('proveedor').value;
+        if (cat === 'TODAS') {
+            reconstruirSelect('proveedor', datosGlobales.proveedores, 'Todos los proveedores', 'TODOS');
+        } else {
+            const filtrados = datosGlobales.relacionCP[cat] || [];
+            reconstruirSelect('proveedor', filtrados, 'Todos los proveedores de esta categoría', 'TODOS');
+        }
+        const opts = Array.from(document.getElementById('proveedor').options);
+        if (opts.some(o => o.value === provActual)) document.getElementById('proveedor').value = provActual;
+    }
+
+    function reconstruirSelect(id, items, textoDefault, valorDefault) {
+        const sel = document.getElementById(id);
+        sel.innerHTML = `<option value="${valorDefault}">📋 ${textoDefault}</option>`;
+        items.forEach(item => { sel.innerHTML += `<option value="${item}">${item}</option>`; });
+    }
+
+    function actualizarPreview() {
+        const pct = parseFloat(document.getElementById('porcentaje').value);
+        const prov = document.getElementById('proveedor').value;
+        const cat  = document.getElementById('categoria').value;
+        const banner = document.getElementById('preview-banner');
+        const textEl = document.getElementById('preview-text');
+
+        if (!pct || pct <= 0) { banner.style.display = 'none'; return; }
+
+        const provLabel = prov === 'TODOS' ? 'todos los proveedores' : `<strong>${prov}</strong>`;
+        const catLabel  = cat  === 'TODAS' ? 'todas las categorías' : `<strong>${cat}</strong>`;
+        textEl.innerHTML = `Se aplicará un aumento de <strong>${pct}%</strong> a ${provLabel} / ${catLabel}.`;
+        banner.style.display = 'flex';
+    }
+
+    function ejecutarAumento() {
+        const porcentajeStr = document.getElementById('porcentaje').value.replace(',', '.');
+        const porcentaje = parseFloat(porcentajeStr);
+        if (isNaN(porcentaje) || porcentaje <= 0) {
+            showResult('error', '❌ Ingresa un porcentaje válido mayor a 0.');
+            return;
+        }
+
+        const proveedor = document.getElementById('proveedor').value;
+        const categoria = document.getElementById('categoria').value;
+        const msg = `¿Confirmas aplicar un ${porcentaje}% de aumento?\n\n• Proveedor: ${proveedor}\n• Categoría: ${categoria}`;
+        if (!confirm(msg)) return;
+
+        const btn = document.getElementById('btn-aplicar');
+        btn.disabled = true;
+        btn.innerHTML = '<div style="width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,0.3);border-top-color:white;animation:spin 0.7s linear infinite;"></div> Aplicando...';
+
+        google.script.run
+            .withSuccessHandler(function (res) {
+                showResult('success', `✅ Aumento aplicado exitosamente a <strong>${res.actualizados}</strong> materiales.`);
+                btn.disabled = false;
+                btn.innerHTML = '✅ Aplicar Aumento';
+            })
+            .withFailureHandler(function (err) {
+                showResult('error', '❌ Error: ' + err.message);
+                btn.disabled = false;
+                btn.innerHTML = '✅ Aplicar Aumento';
+            })
+            .aplicarAumentoMasivo({ proveedor, categoria, porcentaje });
+    }
+
+    function showResult(type, msg) {
+        const el = document.getElementById('result-alert');
+        el.className = 'result-alert ' + type;
+        el.innerHTML = msg;
+        el.style.display = 'flex';
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+</script>
+</body>
+</html>
