@@ -178,8 +178,8 @@
                     </div>
                     <div class="col-md-8">
                         <label class="form-label">Cliente</label>
-                        <input class="form-control" list="clientes-list" id="cliente" placeholder="Buscar cliente..."
-                            required>
+                        <input type="search" class="form-control" list="clientes-list" id="cliente"
+                            placeholder="Buscar cliente..." required onfocus="this.select()">
                         <datalist id="clientes-list"></datalist>
                     </div>
                 </div>
@@ -370,24 +370,24 @@
             const id = Date.now();
             const html = `
       <div class="product-row row g-2 align-items-end" id="prod_${id}">
-        <div class="col-md-3">
+        <div class="col-md-12">
           <label class="form-label small text-muted mb-1">Categoría</label>
-          <input class="form-control prod-cat" list="categorias-list" placeholder="Filtrar cat..." onchange="filtrarProductos('${id}')" oninput="filtrarProductos('${id}')">
+          <input type="search" class="form-control prod-cat" list="categorias-list" placeholder="Filtrar cat..." onchange="filtrarProductos('${id}')" oninput="filtrarProductos('${id}')" onfocus="this.select()">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-12">
           <label class="form-label small text-muted mb-1">Producto</label>
-          <input class="form-control prod-name" list="list_${id}" placeholder="Seleccionar producto..." oninput="calcularTotales(); evaluarStocks();" onchange="evaluarStocks();">
+          <input type="search" class="form-control prod-name" list="list_${id}" placeholder="Seleccionar producto..." oninput="actualizarPrecioYCalcular('${id}')" onchange="actualizarPrecioYCalcular('${id}')" onfocus="this.select()">
           <datalist id="list_${id}"></datalist>
         </div>
-        <div class="col-md-1">
+        <div class="col-md-3">
           <label class="form-label small text-muted mb-1">Cant.</label>
           <input type="number" class="form-control prod-qty" value="1" min="1" step="1" oninput="this.value = Math.round(this.value); calcularTotales(); evaluarStocks();">
         </div>
-        <div class="col-md-2">
+        <div class="col-md-4">
           <label class="form-label small text-muted mb-1">Precio U.</label>
           <input type="number" class="form-control prod-price" placeholder="0.00" step="0.01" oninput="calcularTotales()">
         </div>
-        <div class="col-md-2 d-flex gap-2">
+        <div class="col-md-5 d-flex gap-2">
           <input type="text" class="form-control bg-white text-end prod-sub" readonly value="0.00">
           <button type="button" class="btn btn-outline-danger" onclick="document.getElementById('prod_${id}').remove(); calcularTotales(); evaluarStocks();">X</button>
         </div>
@@ -412,6 +412,22 @@
                     dl.appendChild(opt);
                 }
             });
+        }
+
+        function actualizarPrecioYCalcular(rowId) {
+            const row = document.getElementById('prod_' + rowId);
+            if (!row) return;
+            const nombre = row.querySelector('.prod-name').value;
+            const currentSelected = row.dataset.selectedProd || "";
+            if (nombre !== currentSelected) {
+                const prodItem = CATALOGO.find(p => p.nombre === nombre);
+                if (prodItem) {
+                    row.querySelector('.prod-price').value = prodItem.precio || 0;
+                    row.dataset.selectedProd = nombre;
+                }
+            }
+            calcularTotales();
+            evaluarStocks();
         }
 
         function agregarDescuento() {

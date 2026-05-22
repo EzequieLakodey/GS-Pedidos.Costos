@@ -157,16 +157,22 @@ function obtenerDataInicialPedidos() {
     const colMod  = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "MODELO");
     const colStock = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "STOCK");
     const colMat  = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "MATERIALES");
+    let colPrecio = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "PRECIO");
+    if (colPrecio === -1 && headers.length >= 14) {
+      colPrecio = 13; // Columna N es el índice 13
+    }
 
     for (let i = filaInicioProds - 1; i < data.length; i++) {
       if (colId !== -1 && data[i][colId] && data[i][colId].toString().trim() !== "") {
         let recetaTexto = colMat !== -1 && data[i][colMat] ? data[i][colMat].toString() : "";
+        let precioVal = colPrecio !== -1 && data[i][colPrecio] !== undefined ? parseFloat(data[i][colPrecio]) || 0 : 0;
         productos.push({
           id: data[i][colId],
           categoria: colCat !== -1 && data[i][colCat] ? data[i][colCat].toString().trim() : "Sin Categoría",
           nombre: ((colCat !== -1 && data[i][colCat] ? data[i][colCat] : "") + " - " + (colMod !== -1 && data[i][colMod] ? data[i][colMod] : "")).trim(),
           stock: colStock !== -1 ? parseFloat(data[i][colStock]) || 0 : 0,
-          receta: parsearReceta(recetaTexto)
+          receta: parsearReceta(recetaTexto),
+          precio: precioVal
         });
       }
     }
@@ -232,36 +238,39 @@ function guardarNuevoPedido(datos) {
     // Col E (5): TOTAL (Numérico)
     sheet.getRange(filaNum, 5).setValue(datos.totalGeneral);
 
-    // Col F (6): T.C
-    sheet.getRange(filaNum, 6).setValue(datos.tc);
+    // Col F (6): CUENTA (Monto por el cual se pagó o 0)
+    sheet.getRange(filaNum, 6).setValue(datos.montoPago || 0);
 
-    // Col G (7): DTO (porcentaje de descuento en cascada)
+    // Col G (7): T.C
+    sheet.getRange(filaNum, 7).setValue(datos.tc);
+
+    // Col H (8): DTO (porcentaje de descuento en cascada)
     let dtoEquiv = datos.factorDesc === 1 ? 0 : (1 - datos.factorDesc);
-    sheet.getRange(filaNum, 7).setValue(dtoEquiv).setNumberFormat("0.00%");
+    sheet.getRange(filaNum, 8).setValue(dtoEquiv).setNumberFormat("0.00%");
 
-    // Col H (8): IMP (Porcentaje de impuestos)
+    // Col I (9): IMP (Porcentaje de impuestos)
     let impPctNum = parseFloat(datos.impuesto_pct) || 0;
-    sheet.getRange(filaNum, 8).setValue(impPctNum / 100).setNumberFormat("0.00%");
+    sheet.getRange(filaNum, 9).setValue(impPctNum / 100).setNumberFormat("0.00%");
 
-    // Col I (9): DIAS TRANSCURRIDOS (Ignorado - Fórmula Excel)
+    // Col J (10): DIAS TRANSCURRIDOS (Ignorado - Fórmula Excel)
 
-    // Col J (10): PLAZO DE ENTREGA
-    sheet.getRange(filaNum, 10).setValue(datos.plazo);
+    // Col K (11): PLAZO DE ENTREGA
+    sheet.getRange(filaNum, 11).setValue(datos.plazo);
 
-    // Col K (11): TIEMPO (Ignorado - Fórmula Excel)
+    // Col L (12): TIEMPO (Ignorado - Fórmula Excel)
 
-    // Col L (12): FORMA ENTREGA (RETIRA | NOMBRE o ENVIO | DETALLE)
+    // Col M (13): FORMA ENTREGA (RETIRA | NOMBRE o ENVIO | DETALLE)
     let f_entrega_str = datos.f_entrega.toUpperCase() === "RETIRA"
       ? `RETIRA | ${datos.detalle_entrega || ''}`
       : `ENVIO | ${datos.detalle_entrega || ''}`;
-    sheet.getRange(filaNum, 12).setValue(f_entrega_str);
+    sheet.getRange(filaNum, 13).setValue(f_entrega_str);
 
-    // Col M (13): ESTADO
+    // Col N (14): ESTADO
     let estadoFinal = datos.estado || "No Encomendado";
-    sheet.getRange(filaNum, 13).setValue(estadoFinal);
+    sheet.getRange(filaNum, 14).setValue(estadoFinal);
 
-    // Col N (14): CUENTA (Monto por el cual se pagó o 0)
-    sheet.getRange(filaNum, 14).setValue(datos.montoPago || 0);
+    // ACTUALIZAR PRECIOS EN LA HOJA PRODUCTOS SI FUERON MODIFICADOS
+    actualizarPreciosProductos(datos.productos);
 
     // LÓGICA DE DESCUENTO DE STOCK
     if (estadoFinal === "Terminado" || estadoFinal === "Producir") {
@@ -440,9 +449,17 @@ function obtenerDatosPedidoParcial() {
   if (!fila) return null;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(CONFIG.HOJA_PEDIDOS);
-  const datos = sheet.getRange(fila, 1, 1, 14).getValues()[0];
 
-  let pedidoTexto = datos[2] ? datos[2].toString() : "";
+  const headers = sheet.getRange(CONFIG.FILA_HEADERS, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(h => h.toString().trim().toUpperCase());
+  const datos = sheet.getRange(fila, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  const getValByHeader = (headerName) => {
+    const idx = headers.indexOf(headerName.toUpperCase());
+    return idx !== -1 ? datos[idx] : null;
+  };
+
+  let pedidoTexto = getValByHeader("PEDIDO") ? getValByHeader("PEDIDO").toString() : "";
   let productos = pedidoTexto.split('\n').filter(l => l.trim()).map(linea => {
     let partes = linea.split('|').map(s => s.trim());
     if (partes.length >= 4) {
@@ -456,18 +473,22 @@ function obtenerDatosPedidoParcial() {
     return null;
   }).filter(Boolean);
 
-  let subtotalLimpio = parseFloat(datos[3]) || 0;
-  let totalLimpio = parseFloat(datos[4]) || 0;
-  let tcOriginal = parseFloat(datos[5]) || 1;
-  let cuentaVal = parseFloat(datos[13]) || 0;
+  let subtotalLimpio = parseFloat(getValByHeader("SUBTOTAL")) || 0;
+  let totalLimpio = parseFloat(getValByHeader("TOTAL")) || 0;
+  let tcOriginal = parseFloat(getValByHeader("T.C")) || 1;
+  let cuentaVal = parseFloat(getValByHeader("CUENTA")) || 0;
+  let descPct = parseFloat(getValByHeader("DTO")) || 0;
+  let impPct = parseFloat(getValByHeader("IMP")) || 0;
 
   return {
-    fila, cliente: datos[1], productos,
+    fila,
+    cliente: getValByHeader("CLIENTE") || "",
+    productos,
     subtotal: subtotalLimpio,
     total: totalLimpio,
     tc: tcOriginal,
-    descuento_pct: datos[6],
-    impuesto_pct: datos[7],
+    descuento_pct: descPct,
+    impuesto_pct: impPct,
     pagado_hasta_ahora: cuentaVal
   };
 }
@@ -561,4 +582,40 @@ function getColMap(sheet, headersObj, headerRow) {
     map[key] = col;
   });
   return map;
+}
+
+function actualizarPreciosProductos(productosPedido) {
+  try {
+    const ssCostos = obtenerSSCostos();
+    const hojaProds = obtenerHojaProductos(ssCostos);
+    if (!hojaProds) return;
+
+    const filaHeadersProds = detectarFilaHeaders(hojaProds);
+    const headers = hojaProds.getRange(filaHeadersProds, 1, 1, hojaProds.getLastColumn()).getValues()[0]
+      .map(h => h.toString().trim().toUpperCase());
+    
+    const colId = headers.indexOf("ID") + 1;
+    let colPrecio = headers.indexOf("PRECIO") + 1;
+    if (colPrecio === 0 && hojaProds.getLastColumn() >= 14) {
+      colPrecio = 14; // Fallback a columna N
+    }
+    
+    if (colId === 0 || colPrecio === 0) return;
+
+    const data = hojaProds.getDataRange().getValues();
+
+    for (const prod of productosPedido) {
+      if (!prod.id) continue;
+      
+      const filaIdx = data.findIndex(r => r[colId - 1] === prod.id);
+      if (filaIdx !== -1) {
+        const precioActual = parseFloat(data[filaIdx][colPrecio - 1]) || 0;
+        if (prod.precio_unitario !== precioActual) {
+          hojaProds.getRange(filaIdx + 1, colPrecio).setValue(prod.precio_unitario);
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error al actualizar precios de productos: " + e.message);
+  }
 }
