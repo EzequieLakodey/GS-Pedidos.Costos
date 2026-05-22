@@ -5,271 +5,100 @@
     <meta charset="UTF-8">
     <base target="_top">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
-            font-family: 'Outfit', sans-serif;
-            padding: 15px;
-            color: #334155;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .card {
-            border: none;
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            width: 100%;
-            max-width: 600px;
-        }
-
-        .section-title {
-            font-size: 1.05rem;
-            color: #2563eb;
-            font-weight: 600;
-            margin-bottom: 1.25rem;
-            border-bottom: 2px solid #eff6ff;
-            padding-bottom: 6px;
-            letter-spacing: 0.3px;
-        }
-
-        .stock-box {
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 18px;
-            margin-bottom: 15px;
-            border: 1px solid #f1f5f9;
-        }
-
-        .btn-action {
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
-            transition: all 0.2s ease-in-out;
-        }
-
-        .btn-action:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
-            background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
-        }
-
-        .form-control,
-        .form-select {
-            border-radius: 8px;
-            border: 1px solid #cbd5e1;
-            padding: 0.55rem 0.75rem;
-            color: #334155;
-            transition: all 0.2s;
-        }
-
-        .form-control:focus,
-        .form-select:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-        }
-
-        .form-label {
-            font-weight: 500;
-            color: #475569;
-            font-size: 0.9rem;
-            margin-bottom: 0.4rem;
-        }
-
-        .badge-stock {
-            font-size: 1.1rem;
-            font-weight: 700;
-        }
+        body { font-family: 'Outfit', sans-serif; background: #f8fafc; padding: 20px; }
+        .card { border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .table-container { max-height: 500px; overflow-y: auto; }
+        .input-qty { width: 80px; }
+        .btn-action { background: #2563eb; color: white; }
     </style>
 </head>
 
 <body>
     <div class="card p-4">
-        <h4 class="mb-4 text-center text-secondary" id="form-title">📦 Aumentar Stock</h4>
-
-        <div id="loading" class="text-center py-4">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
+        <h4 class="mb-3" id="title">Aumentar Stock en Lote</h4>
+        
+        <div class="row g-2 mb-3">
+            <div class="col-md-6">
+                <select class="form-select" id="filtroCat" onchange="renderTable()">
+                    <option value="">Todas las categorías/proveedores</option>
+                </select>
             </div>
-            <p class="mt-2 text-muted small">Cargando catálogo de la base de datos...</p>
+            <div class="col-md-6">
+                <input type="text" class="form-control" id="search" placeholder="Buscar por nombre..." oninput="renderTable()">
+            </div>
         </div>
 
-        <form id="formStock" class="d-none">
-            <!-- FILTRO DE NIVEL 1 (Proveedor o Categoría) -->
-            <div class="mb-3" id="wrapper-filtro1">
-                <label class="form-label" id="label-filtro1">Filtro</label>
-                <select class="form-select" id="filtro1" onchange="onFiltro1Changed()">
-                    <option value="">Seleccionar...</option>
-                </select>
-            </div>
+        <div class="table-container">
+            <table class="table table-hover align-middle">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th>Nombre</th>
+                        <th class="text-center">Stock</th>
+                        <th>Aumentar</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
 
-            <!-- FILTRO DE NIVEL 2 (Material o Producto) -->
-            <div class="mb-3">
-                <label class="form-label" id="label-filtro2">Item</label>
-                <select class="form-select" id="filtro2" onchange="onFiltro2Changed()" required>
-                    <option value="">Seleccionar...</option>
-                </select>
-            </div>
-
-            <!-- VISUALIZACIÓN DE STOCK ACTUAL -->
-            <div class="stock-box text-center d-none" id="stock-viewer">
-                <span class="text-muted d-block small mb-1">Stock Actual</span>
-                <span class="badge bg-secondary badge-stock" id="stock-actual-val">0</span>
-            </div>
-
-            <!-- CANTIDAD A INCREMENTAR -->
-            <div class="mb-4">
-                <label class="form-label">Cantidad a Incrementar</label>
-                <input type="number" class="form-control" id="incremento" min="1" step="1" required placeholder="Ej: 50">
-            </div>
-
-            <button type="button" class="btn btn-primary w-100 py-3 btn-action" id="btnGuardar" onclick="enviarFormulario()">GUARDAR E INCREMENTAR STOCK</button>
-        </form>
+        <button class="btn btn-action w-100 mt-3" onclick="enviarLote()">GUARDAR CAMBIOS</button>
     </div>
 
     <script>
-        const MODO = "<?= modo ?>"; // "materiales" o "productos"
-        let DATA_RAW = null;
-        let selectedItem = null;
+        const MODO = "<?= modo ?>";
+        let DATA = [];
 
         window.onload = () => {
-            // Configurar títulos según modo
-            const isMat = MODO === "materiales";
-            document.getElementById('form-title').innerText = isMat ? "🌾 Aumentar Stock de Materiales" : "📦 Aumentar Stock de Productos";
-            document.getElementById('label-filtro1').innerText = isMat ? "Filtrar por Proveedor" : "Filtrar por Categoría";
-            document.getElementById('label-filtro2').innerText = isMat ? "Seleccionar Material" : "Seleccionar Producto";
-
-            google.script.run
-                .withSuccessHandler(data => {
-                    DATA_RAW = data;
-                    document.getElementById('loading').classList.add('d-none');
-                    document.getElementById('formStock').classList.remove('d-none');
-
-                    // Llenar primer filtro
-                    const f1 = document.getElementById('filtro1');
-                    f1.innerHTML = '<option value="">Todos...</option>';
-
-                    const options = isMat ? data.proveedores : data.categorias;
-                    options.forEach(opt => {
-                        let el = document.createElement('option');
-                        el.value = opt;
-                        el.innerText = opt;
-                        f1.appendChild(el);
-                    });
-
-                    // Cargar todos los items inicialmente en filtro 2
-                    actualizarFiltro2();
-                })
-                .withFailureHandler(err => {
-                    alert("Error al cargar datos iniciales: " + err.message);
-                })
-                .obtenerDataParaStocks();
+            document.getElementById('title').innerText = MODO === 'materiales' ? '🌾 Stock Materiales' : '📦 Stock Productos';
+            google.script.run.withSuccessHandler(data => {
+                DATA = MODO === 'materiales' ? data.materiales : data.productos;
+                // Llenar filtro
+                const f1 = document.getElementById('filtroCat');
+                const opts = [...new Set(DATA.map(i => MODO === 'materiales' ? i.proveedor : i.categoria))];
+                opts.forEach(o => f1.innerHTML += `<option value="${o}">${o}</option>`);
+                renderTable();
+            }).obtenerDataParaStocks();
         };
 
-        function actualizarFiltro2() {
-            const isMat = MODO === "materiales";
-            const f1Value = document.getElementById('filtro1').value;
-            const f2 = document.getElementById('filtro2');
-            f2.innerHTML = '<option value="">Selecciona un item...</option>';
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            const cat = document.getElementById('filtroCat').value;
+            const search = document.getElementById('search').value.toLowerCase();
+            tbody.innerHTML = '';
 
-            const items = isMat ? DATA_RAW.materiales : DATA_RAW.productos;
+            DATA.filter(i => 
+                (!cat || (MODO === 'materiales' ? i.proveedor : i.categoria) === cat) &&
+                i.nombre.toLowerCase().includes(search)
+            ).forEach((item, index) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${item.nombre}</td>
+                        <td class="text-center">${item.stock}</td>
+                        <td><input type="number" class="form-control input-qty qty-val" data-index="${index}" value="0" min="0"></td>
+                    </tr>
+                `;
+            });
+        }
 
-            items.forEach(item => {
-                const matchFiltro = !f1Value || (isMat ? item.proveedor === f1Value : item.categoria === f1Value);
-                if (matchFiltro) {
-                    let el = document.createElement('option');
-                    el.value = item.nombre;
-                    el.innerText = item.nombre;
-                    f2.appendChild(el);
+        function enviarLote() {
+            const updates = [];
+            document.querySelectorAll('.qty-val').forEach(input => {
+                const val = parseInt(input.value);
+                if (val > 0) {
+                    updates.push({ nombre: DATA[input.dataset.index].nombre, incremento: val });
                 }
             });
 
-            document.getElementById('stock-viewer').classList.add('d-none');
-            selectedItem = null;
-        }
-
-        function onFiltro1Changed() {
-            actualizarFiltro2();
-        }
-
-        function onFiltro2Changed() {
-            const f2Value = document.getElementById('filtro2').value;
-            if (!f2Value) {
-                document.getElementById('stock-viewer').classList.add('d-none');
-                selectedItem = null;
-                return;
-            }
-
-            const isMat = MODO === "materiales";
-            const items = isMat ? DATA_RAW.materiales : DATA_RAW.productos;
-            selectedItem = items.find(item => item.nombre === f2Value);
-
-            if (selectedItem) {
-                const viewer = document.getElementById('stock-viewer');
-                const val = document.getElementById('stock-actual-val');
-                viewer.classList.remove('d-none');
-                val.innerText = selectedItem.stock;
-                
-                // Cambiar color de badge según stock
-                if (selectedItem.stock <= 0) {
-                    val.className = "badge bg-danger badge-stock";
-                } else if (selectedItem.stock < 10) {
-                    val.className = "badge bg-warning text-dark badge-stock";
-                } else {
-                    val.className = "badge bg-success badge-stock";
-                }
-            }
-        }
-
-        function enviarFormulario() {
-            const form = document.getElementById('formStock');
-            if (!form.checkValidity()) {
-                form.reportValidity();
-                return;
-            }
-
-            const btn = document.getElementById('btnGuardar');
-            const itemNombre = document.getElementById('filtro2').value;
-            const incremento = parseFloat(document.getElementById('incremento').value) || 0;
-
-            if (incremento <= 0) {
-                alert("La cantidad a incrementar debe ser mayor a 0.");
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerText = "PROCESANDO... ⏳";
-
-            google.script.run
-                .withSuccessHandler(resp => {
-                    if (resp.success) {
-                        alert("¡Stock incrementado con éxito! Nuevo stock: " + resp.nuevoStock);
-                        google.script.host.close();
-                    } else {
-                        alert("Error: " + resp.message);
-                        btn.disabled = false;
-                        btn.innerText = "GUARDAR E INCREMENTAR STOCK";
-                    }
-                })
-                .withFailureHandler(err => {
-                    alert("Error de sistema: " + err.message);
-                    btn.disabled = false;
-                    btn.innerText = "GUARDAR E INCREMENTAR STOCK";
-                })
-                .guardarStockIncrementado(MODO, itemNombre, incremento);
+            if (updates.length === 0) return alert("No hay cambios para guardar.");
+            
+            document.getElementById('tableBody').parentElement.parentElement.classList.add('opacity-50');
+            google.script.run.withSuccessHandler(() => {
+                alert("Stock actualizado exitosamente.");
+                google.script.host.close();
+            }).guardarStockLote(MODO, updates);
         }
     </script>
 </body>
-
 </html>

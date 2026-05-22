@@ -60,6 +60,10 @@ function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('⚙️ Gestión Integral')
     .addItem('➕ Cargar Nuevo Pedido', 'abrirModalPedidos')
+    .addSeparator()
+    .addItem('💱 Modificar Tipo de Cambio', 'modificarTipoCambio')
+    .addItem('🌾 Aumentar Stock Materiales', 'abrirModalStocksMateriales')
+    .addItem('📦 Aumentar Stock Productos', 'abrirModalStocksProductos')
     .addToUi();
 }
 
@@ -565,6 +569,126 @@ function guardarEntregaParcial(datos) {
     return { success: false, message: e.message };
   }
 }
+// --- FUNCIONES DE GESTIÓN Y STOCK ---
+
+function modificarTipoCambio() {
+  const ssCostos = obtenerSSCostos();
+  const hojaProds = obtenerHojaProductos(ssCostos);
+  const tcActual = parseFloat(hojaProds.getRange("G1").getValue()) || 1;
+
+  const response = SpreadsheetApp.getUi().prompt('💱 Tipo de Cambio', 'Ingrese el nuevo tipo de cambio (Ref):', SpreadsheetApp.getUi().ButtonSet.OK_CANCEL);
+  
+  if (response.getSelectedButton() === SpreadsheetApp.getUi().Button.OK) {
+    const nuevoTc = parseFloat(response.getResponseText());
+    if (!isNaN(nuevoTc) && nuevoTc > 0) {
+      hojaProds.getRange("G1").setValue(nuevoTc);
+      SpreadsheetApp.getUi().alert('✅ Tipo de cambio actualizado a: ' + nuevoTc);
+    } else {
+      SpreadsheetApp.getUi().alert('❌ Valor inválido.');
+    }
+  }
+}
+
+function abrirModalStocksMateriales() { abrirModalStocks("materiales"); }
+function abrirModalStocksProductos() { abrirModalStocks("productos"); }
+
+function abrirModalStocks(modo) {
+  const template = HtmlService.createTemplateFromFile('FormularioModificarStocks');
+  template.modo = modo;
+  SpreadsheetApp.getUi().showModalDialog(
+    template.evaluate().setWidth(600).setHeight(650),
+    modo === "materiales" ? "🌾 Aumentar Stock Materiales" : "📦 Aumentar Stock Productos"
+  );
+}
+
+function obtenerDataParaStocks() {
+  const ssCostos = obtenerSSCostos();
+  const hojaProds = obtenerHojaProductos(ssCostos);
+  const hojaMat = ssCostos.getSheetByName(CONFIG.HOJA_MATERIALES);
+
+  // Materiales
+  let materiales = [];
+  if (hojaMat) {
+    const data = hojaMat.getDataRange().getValues();
+    const headers = data[0].map(h => h.toString().trim());
+    const colDetalle = headers.indexOf("Detalles");
+    const colStock = headers.indexOf("STOCK");
+    const colProv = headers.indexOf("Proveedor");
+    
+    for (let i = 1; i < data.length; i++) {
+      if (colDetalle !== -1 && data[i][colDetalle]) {
+        materiales.push({
+          nombre: data[i][colDetalle].toString().trim(),
+          stock: colStock !== -1 ? parseFloat(data[i][colStock]) || 0 : 0,
+          proveedor: colProv !== -1 ? data[i][colProv].toString().trim() : "Sin Proveedor"
+        });
+      }
+    }
+  }
+
+  // Productos
+  let productos = [];
+  if (hojaProds) {
+    const filaHeaders = detectarFilaHeaders(hojaProds);
+    const data = hojaProds.getDataRange().getValues();
+    const headers = data[filaHeaders - 1].map(h => h.toString().trim());
+    const colCat = headers.indexOf("CATEGORIA");
+    const colMod = headers.indexOf("MODELO");
+    const colStock = headers.indexOf("STOCK");
+
+    for (let i = filaHeaders; i < data.length; i++) {
+      if (colMod !== -1 && data[i][colMod]) {
+        productos.push({
+          nombre: ( (colCat !== -1 ? data[i][colCat] : "") + " - " + data[i][colMod] ).trim(),
+          stock: colStock !== -1 ? parseFloat(data[i][colStock]) || 0 : 0,
+          categoria: colCat !== -1 ? data[i][colCat].toString().trim() : "Sin Categoría"
+        });
+      }
+    }
+  }
+
+  return {
+    materiales,
+    productos,
+    proveedores: [...new Set(materiales.map(m => m.proveedor).filter(p => p))],
+    categorias: [...new Set(productos.map(p => p.categoria).filter(c => c))]
+  };
+}
+
+function guardarStockLote(tipo, updates) {
+  try {
+    const ssCostos = obtenerSSCostos();
+    const hoja = tipo === "materiales" ? ssCostos.getSheetByName(CONFIG.HOJA_MATERIALES) : obtenerHojaProductos(ssCostos);
+    if (!hoja) throw new Error("No se encontró la hoja de " + tipo);
+
+    const filaHeaders = tipo === "materiales" ? 1 : detectarFilaHeaders(hoja);
+    const data = hoja.getDataRange().getValues();
+    const headers = data[filaHeaders - 1].map(h => h.toString().trim());
+    
+    const colStock = headers.indexOf("STOCK") + 1;
+    const colClave = tipo === "materiales" ? headers.indexOf("Detalles") + 1 : headers.indexOf("MODELO") + 1;
+    const colCat = tipo === "productos" ? headers.indexOf("CATEGORIA") + 1 : -1;
+
+    updates.forEach(u => {
+        let filaIdx = -1;
+        for (let i = filaHeaders; i < data.length; i++) {
+            let claveMatch = data[i][colClave - 1] && data[i][colClave - 1].toString().trim() === u.nombre.split(" - ").pop();
+            let catMatch = tipo === "productos" ? (data[i][colCat - 1] && data[i][colCat - 1].toString().trim() === u.nombre.split(" - ").shift()) : true;
+            if (claveMatch && catMatch) { filaIdx = i + 1; break; }
+        }
+
+        if (filaIdx !== -1) {
+            const stockActual = parseFloat(hoja.getRange(filaIdx, colStock).getValue()) || 0;
+            hoja.getRange(filaIdx, colStock).setValue(stockActual + u.incremento);
+        }
+    });
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
 // --- HELPER FUNCTIONS ---
 
 function getColIndex(sheet, headerName, headerRow) {
