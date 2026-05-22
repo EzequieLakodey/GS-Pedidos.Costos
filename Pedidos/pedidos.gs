@@ -64,6 +64,8 @@ function onOpen() {
     .addItem('💱 Modificar Tipo de Cambio', 'modificarTipoCambio')
     .addItem('🌾 Aumentar Stock Materiales', 'abrirModalStocksMateriales')
     .addItem('📦 Aumentar Stock Productos', 'abrirModalStocksProductos')
+    // Para agregar el botón a tu menú existente en el onOpen():
+    .addItem('🔠 Convertir Clientes a Mayúsculas', 'normalizarRazonesSociales')
     .addToUi();
 }
 
@@ -156,11 +158,11 @@ function obtenerDataInicialPedidos() {
     if (data.length < filaHeadersProds) throw new Error("La hoja de Productos no tiene suficientes filas.");
 
     const headers = data[filaHeadersProds - 1]; // 0-indexed
-    const colId   = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "ID");
-    const colCat  = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "CATEGORIA");
-    const colMod  = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "MODELO");
+    const colId = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "ID");
+    const colCat = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "CATEGORIA");
+    const colMod = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "MODELO");
     const colStock = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "STOCK");
-    const colMat  = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "MATERIALES");
+    const colMat = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "MATERIALES");
     let colPrecio = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "PRECIO");
     if (colPrecio === -1 && headers.length >= 14) {
       colPrecio = 13; // Columna N es el índice 13
@@ -184,7 +186,7 @@ function obtenerDataInicialPedidos() {
     // Intentar leer el Tipo de Cambio desde G1
     try {
       tc = parseFloat(hojaProds.getRange("G1").getValue()) || 1;
-    } catch(e) { tc = 1; }
+    } catch (e) { tc = 1; }
 
     // Obtener Materiales para validación de stock
     let materiales = [];
@@ -194,7 +196,7 @@ function obtenerDataInicialPedidos() {
         const dataMat = hojaMat.getDataRange().getValues();
         const headersMat = dataMat[0]; // Fila 1 (index 0)
         const colMatDetalle = headersMat.findIndex(h => h && h.toString().trim().toUpperCase() === "DETALLES");
-        const colMatStock   = headersMat.findIndex(h => h && h.toString().trim().toUpperCase() === "STOCK");
+        const colMatStock = headersMat.findIndex(h => h && h.toString().trim().toUpperCase() === "STOCK");
 
         for (let i = 1; i < dataMat.length; i++) {
           if (colMatDetalle !== -1 && dataMat[i][colMatDetalle]) {
@@ -205,7 +207,7 @@ function obtenerDataInicialPedidos() {
           }
         }
       }
-    } catch(eMat) {
+    } catch (eMat) {
       materiales = [];
     }
 
@@ -283,11 +285,11 @@ function guardarNuevoPedido(datos) {
 
     // SI ES TERMINADO, MOVER DIRECTAMENTE A LA HOJA TERMINADOS
     if (estadoFinal === "Terminado") {
-       const hojaTerminados = ss.getSheetByName(CONFIG.HOJA_TERMINADOS);
-       if (hojaTerminados) {
-         transferirFilaDinamica(sheet, filaNum, hojaTerminados);
-         sheet.deleteRow(filaNum);
-       }
+      const hojaTerminados = ss.getSheetByName(CONFIG.HOJA_TERMINADOS);
+      if (hojaTerminados) {
+        transferirFilaDinamica(sheet, filaNum, hojaTerminados);
+        sheet.deleteRow(filaNum);
+      }
     }
 
     return { success: true };
@@ -577,7 +579,7 @@ function modificarTipoCambio() {
   const tcActual = parseFloat(hojaProds.getRange("G1").getValue()) || 1;
 
   const response = SpreadsheetApp.getUi().prompt('💱 Tipo de Cambio', 'Ingrese el nuevo tipo de cambio (Ref):', SpreadsheetApp.getUi().ButtonSet.OK_CANCEL);
-  
+
   if (response.getSelectedButton() === SpreadsheetApp.getUi().Button.OK) {
     const nuevoTc = parseFloat(response.getResponseText());
     if (!isNaN(nuevoTc) && nuevoTc > 0) {
@@ -614,7 +616,7 @@ function obtenerDataParaStocks() {
     const colDetalle = headers.indexOf("Detalles");
     const colStock = headers.indexOf("STOCK");
     const colProv = headers.indexOf("Proveedor");
-    
+
     for (let i = 1; i < data.length; i++) {
       if (colDetalle !== -1 && data[i][colDetalle]) {
         materiales.push({
@@ -639,7 +641,7 @@ function obtenerDataParaStocks() {
     for (let i = filaHeaders; i < data.length; i++) {
       if (colMod !== -1 && data[i][colMod]) {
         productos.push({
-          nombre: ( (colCat !== -1 ? data[i][colCat] : "") + " - " + data[i][colMod] ).trim(),
+          nombre: ((colCat !== -1 ? data[i][colCat] : "") + " - " + data[i][colMod]).trim(),
           stock: colStock !== -1 ? parseFloat(data[i][colStock]) || 0 : 0,
           categoria: colCat !== -1 ? data[i][colCat].toString().trim() : "Sin Categoría"
         });
@@ -664,23 +666,23 @@ function guardarStockLote(tipo, updates) {
     const filaHeaders = tipo === "materiales" ? 1 : detectarFilaHeaders(hoja);
     const data = hoja.getDataRange().getValues();
     const headers = data[filaHeaders - 1].map(h => h.toString().trim());
-    
+
     const colStock = headers.indexOf("STOCK") + 1;
     const colClave = tipo === "materiales" ? headers.indexOf("Detalles") + 1 : headers.indexOf("MODELO") + 1;
     const colCat = tipo === "productos" ? headers.indexOf("CATEGORIA") + 1 : -1;
 
     updates.forEach(u => {
-        let filaIdx = -1;
-        for (let i = filaHeaders; i < data.length; i++) {
-            let claveMatch = data[i][colClave - 1] && data[i][colClave - 1].toString().trim() === u.nombre.split(" - ").pop();
-            let catMatch = tipo === "productos" ? (data[i][colCat - 1] && data[i][colCat - 1].toString().trim() === u.nombre.split(" - ").shift()) : true;
-            if (claveMatch && catMatch) { filaIdx = i + 1; break; }
-        }
+      let filaIdx = -1;
+      for (let i = filaHeaders; i < data.length; i++) {
+        let claveMatch = data[i][colClave - 1] && data[i][colClave - 1].toString().trim() === u.nombre.split(" - ").pop();
+        let catMatch = tipo === "productos" ? (data[i][colCat - 1] && data[i][colCat - 1].toString().trim() === u.nombre.split(" - ").shift()) : true;
+        if (claveMatch && catMatch) { filaIdx = i + 1; break; }
+      }
 
-        if (filaIdx !== -1) {
-            const stockActual = parseFloat(hoja.getRange(filaIdx, colStock).getValue()) || 0;
-            hoja.getRange(filaIdx, colStock).setValue(stockActual + u.incremento);
-        }
+      if (filaIdx !== -1) {
+        const stockActual = parseFloat(hoja.getRange(filaIdx, colStock).getValue()) || 0;
+        hoja.getRange(filaIdx, colStock).setValue(stockActual + u.incremento);
+      }
     });
 
     return { success: true };
@@ -717,20 +719,20 @@ function actualizarPreciosProductos(productosPedido) {
     const filaHeadersProds = detectarFilaHeaders(hojaProds);
     const headers = hojaProds.getRange(filaHeadersProds, 1, 1, hojaProds.getLastColumn()).getValues()[0]
       .map(h => h.toString().trim().toUpperCase());
-    
+
     const colId = headers.indexOf("ID") + 1;
     let colPrecio = headers.indexOf("PRECIO") + 1;
     if (colPrecio === 0 && hojaProds.getLastColumn() >= 14) {
       colPrecio = 14; // Fallback a columna N
     }
-    
+
     if (colId === 0 || colPrecio === 0) return;
 
     const data = hojaProds.getDataRange().getValues();
 
     for (const prod of productosPedido) {
       if (!prod.id) continue;
-      
+
       const filaIdx = data.findIndex(r => r[colId - 1] === prod.id);
       if (filaIdx !== -1) {
         const precioActual = parseFloat(data[filaIdx][colPrecio - 1]) || 0;
@@ -741,5 +743,42 @@ function actualizarPreciosProductos(productosPedido) {
     }
   } catch (e) {
     console.error("Error al actualizar precios de productos: " + e.message);
+  }
+}
+
+function normalizarRazonesSociales() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // Cambia "Clientes" por el nombre exacto de tu hoja si es diferente
+  const sheet = ss.getSheetByName("Clientes");
+  if (!sheet) return;
+
+  const filaInicio = 2; // Suponiendo que la fila 1 son los encabezados
+  const ultimaFila = sheet.getLastRow();
+
+  if (ultimaFila < filaInicio) return; // Si no hay datos, salir
+
+  // Obtenemos el rango de la columna A (Razón Social)
+  const rango = sheet.getRange(filaInicio, 1, ultimaFila - filaInicio + 1, 1);
+  const valores = rango.getValues();
+  let huboCambios = false;
+
+  // Recorremos fila por fila
+  for (let i = 0; i < valores.length; i++) {
+    const valorOriginal = valores[i][0].toString();
+    const valorMayuscula = valorOriginal.toUpperCase();
+
+    // Si el texto original es distinto a su versión en mayúsculas, lo reemplazamos
+    if (valorOriginal !== valorMayuscula) {
+      valores[i][0] = valorMayuscula;
+      huboCambios = true;
+    }
+  }
+
+  // Solo escribimos en la hoja si realmente se modificó algo (para que sea más rápido)
+  if (huboCambios) {
+    rango.setValues(valores);
+    SpreadsheetApp.getUi().alert("✅ Éxito", "Se revisaron los clientes y se convirtieron las Razones Sociales a mayúsculas.", SpreadsheetApp.getUi().ButtonSet.OK);
+  } else {
+    SpreadsheetApp.getUi().alert("ℹ️ Información", "Todas las Razones Sociales ya estaban en mayúsculas.", SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
