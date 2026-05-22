@@ -64,10 +64,34 @@ function onOpen() {
     .addItem('💱 Modificar Tipo de Cambio', 'modificarTipoCambio')
     .addItem('🌾 Aumentar Stock Materiales', 'abrirModalStocksMateriales')
     .addItem('📦 Aumentar Stock Productos', 'abrirModalStocksProductos')
-    // Para agregar el botón a tu menú existente en el onOpen():
+    .addSeparator()
+    .addItem('👤 Agregar Nuevo Cliente', 'abrirPromptNuevoCliente')
     .addItem('🔠 Convertir Clientes a Mayúsculas', 'normalizarRazonesSociales')
     .addToUi();
 }
+
+// Nueva función: Agregar cliente desde Prompt
+function abrirPromptNuevoCliente() {
+  const ui = SpreadsheetApp.getUi();
+  const res = ui.alert('Nuevo Cliente', '¿Desea ingresar un nuevo cliente?', ui.ButtonSet.YES_NO);
+  if (res !== ui.Button.YES) return;
+
+  const razon = ui.prompt('Razón Social', 'Ingrese Razón Social:', ui.ButtonSet.OK_CANCEL);
+  const alias = ui.prompt('Alias', 'Ingrese Alias (separados por ;):', ui.ButtonSet.OK_CANCEL);
+  const contacto = ui.prompt('Contacto', 'Ingrese Contacto (separados por ;):', ui.ButtonSet.OK_CANCEL);
+
+  if (razon.getSelectedButton() !== ui.Button.OK || 
+      (razon.getResponseText() === "" && alias.getResponseText() === "" && contacto.getResponseText() === "")) {
+    ui.alert('❌ Error: Debe completar al menos un campo.');
+    return;
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.HOJA_CLIENTES);
+  sheet.appendRow([razon.getResponseText().toUpperCase(), alias.getResponseText(), contacto.getResponseText()]);
+  ui.alert('✅ Cliente agregado correctamente.');
+}
+
 
 // Renombramos a onEditSimple para que Google no lo bloquee por seguridad
 function onEditSimple(e) {
@@ -132,10 +156,12 @@ function obtenerDataInicialPedidos() {
     try {
       const hojaClientes = ss.getSheetByName(CONFIG.HOJA_CLIENTES);
       if (hojaClientes && hojaClientes.getLastRow() >= 2) {
-        clientes = hojaClientes.getRange("A2:A" + hojaClientes.getLastRow()).getValues().flat().filter(v => v && v.toString().trim() !== "");
+        // Obtenemos Razon, Alias, Contacto para el filtro
+        clientes = hojaClientes.getRange("A2:C" + hojaClientes.getLastRow()).getValues()
+          .map(r => ({ razon: r[0], alias: r[1] || "", contacto: r[2] || "" }))
+          .filter(c => c.razon && c.razon.toString().trim() !== "");
       }
     } catch (eClientes) {
-      // Si falla la carga de clientes, continuar sin ellos
       clientes = [];
     }
 
@@ -572,6 +598,29 @@ function guardarEntregaParcial(datos) {
   }
 }
 // --- FUNCIONES DE GESTIÓN Y STOCK ---
+
+function agregarCliente(razon, alias, contacto) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.HOJA_CLIENTES);
+    if (!sheet) throw new Error('No se encontró la hoja de Clientes');
+
+    // Determine if headers exist, but we assume row 1 is headers, data starts at row 2
+    // We will append a row with values: RAZON SOCIAL, ALIAS, CONTACTO, and empty for other columns if needed? Actually the sheet may have more columns.
+    // To keep it simple, we will append only the three columns; if the sheet has more columns, they will be left blank.
+    // Better: get the number of columns in the sheet and fill missing with empty strings.
+    const lastCol = sheet.getLastColumn();
+    const valores = [razon.toUpperCase(), alias, contacto];
+    // Pad with empty strings if there are more columns
+    while (valores.length < lastCol) {
+      valores.push('');
+    }
+    sheet.appendRow(valores);
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
 
 function modificarTipoCambio() {
   const ssCostos = obtenerSSCostos();
