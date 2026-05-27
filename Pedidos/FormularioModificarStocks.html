@@ -37,24 +37,28 @@
 <body>
     <div class="card p-4">
         <h4 class="mb-3" id="title">Aumentar Stock en Lote</h4>
-
         <div class="row g-2 mb-3">
-            <div class="col-md-6">
-                <select class="form-select" id="filtroCat" onchange="renderTable()">
-                    <option value="">Todas las categorías/proveedores</option>
+            <div class="col-md-4">
+                <select class="form-select" id="filtro1" onchange="renderTable()">
+                    <option value="">Filtro Principal...</option>
                 </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
+                <select class="form-select" id="filtro2" onchange="renderTable()">
+                    <option value="">Categoría/Proveedor...</option>
+                </select>
+            </div>
+            <div class="col-md-4">
                 <input type="text" class="form-control" id="search" placeholder="Buscar por nombre..."
                     oninput="renderTable()">
             </div>
         </div>
-
         <div class="table-container">
             <table class="table table-hover align-middle">
                 <thead class="table-light sticky-top">
                     <tr>
                         <th>Nombre</th>
+                        <th>Categoría</th>
                         <th class="text-center">Stock</th>
                         <th>Aumentar</th>
                     </tr>
@@ -62,46 +66,48 @@
                 <tbody id="tableBody"></tbody>
             </table>
         </div>
-
         <button class="btn btn-action w-100 mt-3" onclick="enviarLote()">GUARDAR CAMBIOS</button>
     </div>
-
     <script>
         const MODO = "<?= modo ?>";
         let DATA = [];
-
         window.onload = () => {
             document.getElementById('title').innerText = MODO === 'materiales' ? '🌾 Stock Materiales' : '📦 Stock Productos';
-            google.script.run.withSuccessHandler(data => {
-                DATA = MODO === 'materiales' ? data.materiales : data.productos;
-                // Llenar filtro
-                const f1 = document.getElementById('filtroCat');
-                const opts = [...new Set(DATA.map(i => MODO === 'materiales' ? i.proveedor : i.categoria))];
-                opts.forEach(o => f1.innerHTML += `<option value="${o}">${o}</option>`);
-                renderTable();
-            }).obtenerDataParaStocks();
-        };
+            google.script.run
+                .withSuccessHandler(data => {
+                    DATA = MODO === 'materiales' ? data.materiales : data.productos;
 
+                    // Populate primary filter (Proveedor for materiales, Categoria for productos)
+                    const f1 = document.getElementById('filtro1');
+                    const opts = [...new Set(DATA.map(i => MODO === 'materiales' ? i.proveedor : i.categoria))];
+                    opts.forEach(o => f1.innerHTML += `<option value="${o}">${o}</option>`);
+
+                    renderTable();
+                })
+                .withFailureHandler(err => alert("Error al cargar datos: " + err.message))
+                .obtenerDataParaStocks();
+        };
         function renderTable() {
             const tbody = document.getElementById('tableBody');
-            const cat = document.getElementById('filtroCat').value;
+            const f1 = document.getElementById('filtro1').value;
+            const f2 = document.getElementById('filtro2').value;
             const search = document.getElementById('search').value.toLowerCase();
             tbody.innerHTML = '';
-
             DATA.filter(i =>
-                (!cat || (MODO === 'materiales' ? i.proveedor : i.categoria) === cat) &&
+                (!f1 || (MODO === 'materiales' ? i.proveedor : i.categoria) === f1) &&
+                (!f2 || i.categoria === f2) &&
                 i.nombre.toLowerCase().includes(search)
             ).forEach((item, index) => {
                 tbody.innerHTML += `
                     <tr>
                         <td>${item.nombre}</td>
+                        <td>${item.categoria || '-'}</td>
                         <td class="text-center">${item.stock}</td>
                         <td><input type="number" class="form-control input-qty qty-val" data-index="${index}" value="0" min="0"></td>
                     </tr>
                 `;
             });
         }
-
         function enviarLote() {
             const updates = [];
             document.querySelectorAll('.qty-val').forEach(input => {
@@ -110,14 +116,19 @@
                     updates.push({ nombre: DATA[input.dataset.index].nombre, incremento: val });
                 }
             });
-
             if (updates.length === 0) return alert("No hay cambios para guardar.");
 
             document.getElementById('tableBody').parentElement.parentElement.classList.add('opacity-50');
-            google.script.run.withSuccessHandler(() => {
-                alert("Stock actualizado exitosamente.");
-                google.script.host.close();
-            }).guardarStockLote(MODO, updates);
+            google.script.run
+                .withSuccessHandler(() => {
+                    alert("Stock actualizado exitosamente.");
+                    google.script.host.close();
+                })
+                .withFailureHandler(err => {
+                    document.getElementById('tableBody').parentElement.parentElement.classList.remove('opacity-50');
+                    alert("Error: " + err.message);
+                })
+                .guardarStockLote(MODO, updates);
         }
     </script>
 </body>

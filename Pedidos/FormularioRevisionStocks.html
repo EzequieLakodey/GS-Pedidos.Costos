@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 14px; background: #f8fafc; }
+    h3 { margin-top: 0; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; font-size: 13px; text-align: left; }
+    th { background: #f3f4f6; }
+    .bad { color: #b91c1c; font-weight: 700; }
+    .ok { color: #047857; font-weight: 700; }
+    .actions { margin-top: 12px; text-align: right; }
+    button { background: #e5e7eb; border: 0; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h3>Materiales bajo stock mínimo</h3>
+  <div id="content">Cargando...</div>
+  <div class="actions">
+    <button onclick="google.script.host.close()">Cerrar</button>
+  </div>
+
+  <script>
+    window.onload = () => {
+      google.script.run
+        .withSuccessHandler(rows => {
+          if (!rows || !rows.length) {
+            document.getElementById('content').innerHTML = '<p>No hay alertas activas.</p>';
+            return;
+          }
+          const html = `
+            <table>
+              <thead>
+                <tr>
+                  <th>Material</th>
+                  <th>Categoría</th>
+                  <th>Proveedor</th>
+                  <th>Detalle</th>
+                  <th>Stock mínimo</th>
+                  <th>Stock actual</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows.map(r => `
+                  <tr>
+                    <td>${r.nombre}</td>
+                    <td>${r.categoria || '-'}</td>
+                    <td>${r.proveedor || '-'}</td>
+                    <td>${r.detalle || '-'}</td>
+                    <td>${Number(r.stockMinimo || 0).toFixed(2)}</td>
+                    <td>${Number(r.stockActual || 0).toFixed(2)}</td>
+                    <td class="${r.stockActual <= r.stockMinimo ? 'bad' : 'ok'}">
+                      ${r.stockActual <= r.stockMinimo ? 'ALERTA' : 'OK'}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+          document.getElementById('content').innerHTML = html;
+        })
+        .withFailureHandler(err => {
+          document.getElementById('content').innerHTML = 'Error: ' + err.message;
+        })
+        .obtenerUltimaRevisionStocks();
+    };
+  </script>
+</body>
+</html>

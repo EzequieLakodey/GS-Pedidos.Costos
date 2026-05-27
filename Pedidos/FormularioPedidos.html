@@ -277,11 +277,10 @@
         <div class="row g-3 mb-4">
             <div class="col-md-6">
                 <div class="section-title">Forma de Entrega</div>
-                <select class="form-select mb-2" id="f_entrega" onchange="checkEntrega()">
+                <select class="form-select mb-2" id="f_entrega">
                     <option value="Retira">Retira</option>
                     <option value="Entrega">Entrega</option>
                 </select>
-                <input type="text" class="form-control" id="detalle_entrega" placeholder="¿Quién retira?">
             </div>
             <div class="col-md-6">
                 <div class="section-title">Estado de Cuenta</div>
@@ -541,11 +540,6 @@
             calcularTotales();
         }
 
-        function checkEntrega() {
-            const t = document.getElementById('f_entrega').value;
-            document.getElementById('detalle_entrega').placeholder = t === 'Retira' ? '¿Quién retira?' : '¿Cómo se hace la entrega?';
-        }
-
         function checkCuenta() {
             const isPago = document.getElementById('check_pago').checked;
             const wrapper = document.getElementById('wrapper_monto_inicial');
@@ -740,7 +734,7 @@
                 impuesto_pct: document.getElementById('tipo_impuesto').value === 'custom' ?
                     document.getElementById('impuesto_custom').value : document.getElementById('tipo_impuesto').value,
                 f_entrega: document.getElementById('f_entrega').value,
-                detalle_entrega: document.getElementById('detalle_entrega').value,
+                detalle_entrega: (document.getElementById('detalle_entrega') || { value: '' }).value,
                 plazo: document.getElementById('plazo').value,
                 estado: document.getElementById('estado_pedido').value
             };

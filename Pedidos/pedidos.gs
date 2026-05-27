@@ -64,43 +64,29 @@ function onOpen() {
     .addItem('💱 Modificar Tipo de Cambio', 'modificarTipoCambio')
     .addItem('🌾 Aumentar Stock Materiales', 'abrirModalStocksMateriales')
     .addItem('📦 Aumentar Stock Productos', 'abrirModalStocksProductos')
+    .addItem('📉 Gestionar Alertas de Stock', 'abrirModalAlertasStock')
+    .addItem('🔎 Revisar Stocks Mínimos', 'revisarAlertasStock')
     .addSeparator()
-    .addItem('👤 Agregar Nuevo Cliente', 'abrirPromptNuevoCliente')
     .addItem('🔠 Convertir Clientes a Mayúsculas', 'normalizarRazonesSociales')
     .addToUi();
-}
 
-// Nueva función: Agregar cliente desde Prompt
-function abrirPromptNuevoCliente() {
-  const ui = SpreadsheetApp.getUi();
-  const res = ui.alert('Nuevo Cliente', '¿Desea ingresar un nuevo cliente?', ui.ButtonSet.YES_NO);
-  if (res !== ui.Button.YES) return;
-
-  const razon = ui.prompt('Razón Social', 'Ingrese Razón Social:', ui.ButtonSet.OK_CANCEL);
-  const alias = ui.prompt('Alias', 'Ingrese Alias (separados por ;):', ui.ButtonSet.OK_CANCEL);
-  const contacto = ui.prompt('Contacto', 'Ingrese Contacto (separados por ;):', ui.ButtonSet.OK_CANCEL);
-
-  if (razon.getSelectedButton() !== ui.Button.OK || 
-      (razon.getResponseText() === "" && alias.getResponseText() === "" && contacto.getResponseText() === "")) {
-    ui.alert('❌ Error: Debe completar al menos un campo.');
-    return;
+  try {
+    revisarAlertasStock(true);
+  } catch (e) {
+    console.error("Error revisando alertas al abrir: " + e.message);
   }
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(CONFIG.HOJA_CLIENTES);
-  sheet.appendRow([razon.getResponseText().toUpperCase(), alias.getResponseText(), contacto.getResponseText()]);
-  ui.alert('✅ Cliente agregado correctamente.');
 }
-
 
 // Renombramos a onEditSimple para que Google no lo bloquee por seguridad
 function onEditSimple(e) {
   if (!e?.range) return;
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('BLOQUEAR_ONEDIT') === '1') return;
   const sheet = e.range.getSheet();
   const name = sheet.getName();
   const col = e.range.getColumn();
   const row = e.range.getRow();
-  const val = e.value;
+  const val = e.value || "";
 
   // Solo procesar filas de datos (ignorar encabezados)
   if (row <= CONFIG.FILA_HEADERS) return;
@@ -112,10 +98,22 @@ function onEditSimple(e) {
     const colEstado = headers.findIndex(h => h.toString().trim().toUpperCase() === "ESTADO") + 1;
 
     if (colEstado > 0 && col === colEstado) {
+      const valNorm = val.toString().trim().toUpperCase();
       if (name === CONFIG.HOJA_PEDIDOS) {
-        procesarFlujoPedidos(sheet, row, col, val);
+        if (valNorm === "PRODUCIR" || valNorm === "TERMINADO") {
+          iniciarDecisionStockPorEstado(sheet, row, colEstado, valNorm, e.oldValue);
+          return;
+        }
+        procesarFlujoPedidos(sheet, row, col, valNorm);
       } else if (name === CONFIG.HOJA_TERMINADOS) {
-        procesarFlujoTerminados(sheet, row, col, val);
+        // En la hoja TERMINADOS, también manejamos ENTREGA PARCIAL
+        if (valNorm === "ENTREGA PARCIAL") {
+          PropertiesService.getScriptProperties().setProperty('FILA_ENTREGA_PARCIAL', row.toString());
+          PropertiesService.getScriptProperties().setProperty('HOJA_ENTREGA_PARCIAL', CONFIG.HOJA_TERMINADOS);
+          abrirModalEntregaParcial();
+        } else {
+          procesarFlujoTerminados(sheet, row, col, valNorm);
+        }
       }
     }
   }
@@ -136,6 +134,8 @@ function instalarTodoElSistema() {
 function onEditInstalable(e) {
   if (!e || !e.range) return;
   onEditSimple(e);
+  // 2. Manejar conversión de moneda
+  manejarConversionMoneda(e);
 }
 // --- LÓGICA DE PEDIDOS (FORMULARIO Y GUARDADO) ---
 function abrirModalPedidos() {
@@ -251,55 +251,73 @@ function guardarNuevoPedido(datos) {
     const sheet = ss.getSheetByName(CONFIG.HOJA_PEDIDOS);
 
     const filaNum = sheet.getLastRow() + 1;
+    const headers = sheet.getRange(CONFIG.FILA_HEADERS, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map(h => h.toString().trim().toUpperCase());
 
     // Crear el texto del detalle del pedido: Cantidad | Categoria | Modelo | Precio Unitario
     let pedidoDetalle = datos.productos.map(p =>
-      `${p.cantidad} | ${p.categoria} | ${p.modelo} | $${p.precio_unitario}`
+      `${p.cantidad} | ${p.categoria} | ${p.modelo} | $${p.precio_unitario} ${datos.moneda === 'ARS' ? 'AR$' : 'U$D'}`
     ).join('\n');
 
     // Parsear fecha para evitar el error de formato
     let dateObj = new Date(datos.fecha + "T12:00:00");
 
-    sheet.getRange(filaNum, 1).setValue(dateObj).setNumberFormat('dd/mm/yyyy'); // Col A: FECHA
-    sheet.getRange(filaNum, 2).setValue(datos.cliente); // Col B: CLIENTE
-    sheet.getRange(filaNum, 3).setValue(pedidoDetalle); // Col C: PEDIDO
-
-    // Col D (4): SUBTOTAL (Numérico)
-    sheet.getRange(filaNum, 4).setValue(datos.subtotalBase);
-
-    // Col E (5): TOTAL (Numérico)
-    sheet.getRange(filaNum, 5).setValue(datos.totalGeneral);
-
-    // Col F (6): CUENTA (Monto por el cual se pagó o 0)
-    sheet.getRange(filaNum, 6).setValue(datos.montoPago || 0);
-
-    // Col G (7): T.C
-    sheet.getRange(filaNum, 7).setValue(datos.tc);
-
-    // Col H (8): DTO (porcentaje de descuento en cascada)
-    let dtoEquiv = datos.factorDesc === 1 ? 0 : (1 - datos.factorDesc);
-    sheet.getRange(filaNum, 8).setValue(dtoEquiv).setNumberFormat("0.00%");
-
-    // Col I (9): IMP (Porcentaje de impuestos)
-    let impPctNum = parseFloat(datos.impuesto_pct) || 0;
-    sheet.getRange(filaNum, 9).setValue(impPctNum / 100).setNumberFormat("0.00%");
-
-    // Col J (10): DIAS TRANSCURRIDOS (Ignorado - Fórmula Excel)
-
-    // Col K (11): PLAZO DE ENTREGA
-    sheet.getRange(filaNum, 11).setValue(datos.plazo);
-
-    // Col L (12): TIEMPO (Ignorado - Fórmula Excel)
-
-    // Col M (13): FORMA ENTREGA (RETIRA | NOMBRE o ENVIO | DETALLE)
+    // Construir la forma de entrega
     let f_entrega_str = datos.f_entrega.toUpperCase() === "RETIRA"
-      ? `RETIRA | ${datos.detalle_entrega || ''}`
-      : `ENVIO | ${datos.detalle_entrega || ''}`;
-    sheet.getRange(filaNum, 13).setValue(f_entrega_str);
+      ? `RETIRA`
+      : `ENVIO`;
 
-    // Col N (14): ESTADO
     let estadoFinal = datos.estado || "No Encomendado";
-    sheet.getRange(filaNum, 14).setValue(estadoFinal);
+
+    // Calcular descuento equivalente
+    let dtoEquiv = datos.factorDesc === 1 ? 0 : (1 - datos.factorDesc);
+    let impPctNum = parseFloat(datos.impuesto_pct) || 0;
+
+    // Obtener la fila del cliente en la hoja "Clientes" para el hipervínculo
+    let clienteLink = datos.cliente;
+    try {
+      const hojaClientes = ss.getSheetByName(CONFIG.HOJA_CLIENTES);
+      if (hojaClientes) {
+        const gidClientes = hojaClientes.getSheetId();
+        const clientesData = hojaClientes.getRange("A2:A" + hojaClientes.getLastRow()).getValues().flat();
+        const filaIdx = clientesData.findIndex(c => c && c.toString().trim().toUpperCase() === datos.cliente.trim().toUpperCase());
+        if (filaIdx !== -1) {
+          const filaCliente = filaIdx + 2; // +2 porque el rango empieza en A2 (índice 0)
+          clienteLink = `=HYPERLINK("#gid=${gidClientes}&range=A${filaCliente}"; "${datos.cliente.toUpperCase()}")`;
+        }
+      }
+    } catch (eLink) {
+      console.error("Error al crear link de cliente: " + eLink.message);
+    }
+
+    // Mapeamos los datos correspondientes a cada encabezado
+    const setValByHeader = (headerName, value, numberFormat = null) => {
+      const idx = headers.indexOf(headerName.toUpperCase());
+      if (idx !== -1) {
+        const range = sheet.getRange(filaNum, idx + 1);
+        range.setValue(value);
+        if (numberFormat) {
+          range.setNumberFormat(numberFormat);
+        }
+      }
+    };
+
+    setValByHeader("FECHA", dateObj, 'dd/mm/yyyy');
+    setValByHeader("CLIENTE", clienteLink);
+    setValByHeader("PEDIDO", pedidoDetalle);
+    setValByHeader("SUBTOTAL", datos.subtotalBase);
+    setValByHeader("TOTAL", datos.totalGeneral);
+    setValByHeader("CUENTA", datos.montoPago || 0);
+    setValByHeader("T.C", datos.tc);
+    setValByHeader("DTO", dtoEquiv, "0.00%");
+    setValByHeader("IMP", impPctNum / 100, "0.00%");
+    setValByHeader("PLAZO DE ENTREGA", datos.plazo);
+    setValByHeader("PLAZO", datos.plazo);
+    setValByHeader("FORMA ENTREGA", f_entrega_str);
+    setValByHeader("ESTADO", estadoFinal);
+    setValByHeader("MONEDA", datos.moneda === "ARS" ? "AR$" : "U$D");
+    setValByHeader("MONEDA_ESTADO", datos.moneda === "ARS" ? "AR$" : "U$D"); // <--- AGREGADO AQUÍ
+
 
     // ACTUALIZAR PRECIOS EN LA HOJA PRODUCTOS SI FUERON MODIFICADOS
     actualizarPreciosProductos(datos.productos);
@@ -396,7 +414,8 @@ function transferirFilaDinamica(hojaOrigen, filaOrigen, hojaDestino, valoresExtr
   const headersDestino = hojaDestino.getRange(CONFIG.FILA_HEADERS, 1, 1, hojaDestino.getLastColumn()).getValues()[0]
     .map(h => h.toString().trim().toUpperCase());
 
-  const datosOrigen = hojaOrigen.getRange(filaOrigen, 1, 1, hojaOrigen.getLastColumn()).getValues()[0];
+  const formulasOrigen = hojaOrigen.getRange(filaOrigen, 1, 1, hojaOrigen.getLastColumn()).getFormulas()[0];
+  const valoresOrigen = hojaOrigen.getRange(filaOrigen, 1, 1, hojaOrigen.getLastColumn()).getValues()[0];
 
   // Construir la nueva fila para el destino
   let nuevaFila = headersDestino.map(header => {
@@ -405,7 +424,10 @@ function transferirFilaDinamica(hojaOrigen, filaOrigen, hojaDestino, valoresExtr
 
     // 2. Buscar por nombre en el origen
     const idxOrigen = headersOrigen.indexOf(header);
-    if (idxOrigen !== -1) return datosOrigen[idxOrigen];
+    if (idxOrigen !== -1) {
+      // Si es fórmula (empieza por =), usamos la fórmula para preservar hipervínculos
+      return formulasOrigen[idxOrigen].toString().startsWith('=') ? formulasOrigen[idxOrigen] : valoresOrigen[idxOrigen];
+    }
 
     // 3. Si no existe en el origen ni en extras, devolver vacío
     return "";
@@ -438,8 +460,12 @@ function procesarFlujoPedidos(hoja, fila, columna, valor) {
     moverAEntregados(hoja, fila);
   }
   else if (valNorm === "ENTREGA PARCIAL") {
-    hoja.getRange(fila, 12).setValue("En Produccion");
+    const headers = hoja.getRange(CONFIG.FILA_HEADERS, 1, 1, hoja.getLastColumn()).getValues()[0]
+      .map(h => h.toString().trim().toUpperCase());
+    const colEstado = headers.indexOf("ESTADO") + 1;
+    if (colEstado > 0) hoja.getRange(fila, colEstado).setValue("En Produccion");
     PropertiesService.getScriptProperties().setProperty('FILA_ENTREGA_PARCIAL', fila.toString());
+    PropertiesService.getScriptProperties().setProperty('HOJA_ENTREGA_PARCIAL', CONFIG.HOJA_PEDIDOS);
     abrirModalEntregaParcial();
   }
 }
@@ -478,9 +504,11 @@ function abrirModalEntregaParcial() {
 function obtenerDatosPedidoParcial() {
   const props = PropertiesService.getScriptProperties();
   const fila = parseInt(props.getProperty('FILA_ENTREGA_PARCIAL'));
+  const hojaOrigen = props.getProperty('HOJA_ENTREGA_PARCIAL') || CONFIG.HOJA_PEDIDOS;
   if (!fila) return null;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(CONFIG.HOJA_PEDIDOS);
+  const sheet = ss.getSheetByName(hojaOrigen);
+  if (!sheet) return null;
 
   const headers = sheet.getRange(CONFIG.FILA_HEADERS, 1, 1, sheet.getLastColumn()).getValues()[0]
     .map(h => h.toString().trim().toUpperCase());
@@ -514,6 +542,7 @@ function obtenerDatosPedidoParcial() {
 
   return {
     fila,
+    hoja_origen: hojaOrigen,
     cliente: getValByHeader("CLIENTE") || "",
     productos,
     subtotal: subtotalLimpio,
@@ -528,9 +557,11 @@ function obtenerDatosPedidoParcial() {
 function guardarEntregaParcial(datos) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(CONFIG.HOJA_PEDIDOS);
+    const hojaOrigenNombre = datos.hoja_origen || CONFIG.HOJA_PEDIDOS;
+    const sheet = ss.getSheetByName(hojaOrigenNombre);
     const hEntregados = ss.getSheetByName(CONFIG.HOJA_ENTREGADOS);
     const fila = datos.fila;
+    if (!sheet || !hEntregados) throw new Error("No se encontraron las hojas requeridas para registrar la entrega parcial.");
 
     const headersOrigen = sheet.getRange(CONFIG.FILA_HEADERS, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim().toUpperCase());
     const originalValues = sheet.getRange(fila, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -538,10 +569,21 @@ function guardarEntregaParcial(datos) {
     let entregados = datos.productos_entregados.filter(p => p.cantidad_entregada > 0);
     if (!entregados.length) throw new Error('No se seleccionaron productos.');
 
-    let subEnt = entregados.reduce((sum, p) => sum + (p.cantidad_entregada * p.precio_unitario), 0);
-    let descPct = parseFloat(originalValues[headersOrigen.indexOf("DTO")]) || 0;
-    let impPct = parseFloat(originalValues[headersOrigen.indexOf("IMP")]) || 0;
-    let totalEnt = (subEnt * (1 - descPct)) * (1 + impPct);
+    let subEntBruto = entregados.reduce((sum, p) => sum + (p.cantidad_entregada * p.precio_unitario), 0);
+    let subtotalPendienteActual = parseFloat(originalValues[headersOrigen.indexOf("SUBTOTAL")]) || 0;
+    let totalPendienteActual = parseFloat(originalValues[headersOrigen.indexOf("TOTAL")]) || 0;
+    let pagadoAnterior = parseFloat(originalValues[headersOrigen.indexOf("CUENTA")]) || 0;
+    let pagoRecibido = parseFloat(datos.pago_recibido) || 0;
+    let pagadoTotalAcumulado = pagadoAnterior + pagoRecibido;
+
+    let subBrutoPendiente = (datos.productos_entregados || []).reduce((sum, p) => sum + ((parseFloat(p.cantidad_original) || 0) * (parseFloat(p.precio_unitario) || 0)), 0);
+    let ratioEntregado = subBrutoPendiente > 0 ? (subEntBruto / subBrutoPendiente) : 0;
+    ratioEntregado = Math.max(0, Math.min(1, ratioEntregado));
+
+    // Repartimos sobre el saldo pendiente actual para mantener coherencia con FormularioPedidos.
+    let subEnt = subtotalPendienteActual * ratioEntregado;
+    let totalEnt = totalPendienteActual * ratioEntregado;
+    let cuentaEntregada = pagadoTotalAcumulado * ratioEntregado;
 
     // 1. ENVIAR LO ENTREGADO A LA HOJA "ENTREGADOS"
     const headersDest = hEntregados.getRange(CONFIG.FILA_HEADERS, 1, 1, hEntregados.getLastColumn()).getValues()[0].map(h => h.toString().trim().toUpperCase());
@@ -551,7 +593,7 @@ function guardarEntregaParcial(datos) {
       if (header === "TOTAL") return totalEnt;
       if (header === "T.C") return datos.tc;
       if (header === "ESTADO") return "ENTREGADO";
-      if (header === "CUENTA") return datos.pago_recibido || 0;
+      if (header === "CUENTA") return cuentaEntregada;
       if (header === "FECHA ENTREGA") return new Date();
 
       const idx = headersOrigen.indexOf(header);
@@ -571,14 +613,17 @@ function guardarEntregaParcial(datos) {
     }
 
     let detalleRestante = restantes.map(p => `${p.cantidad_original - p.cantidad_entregada} | ${p.categoria} | ${p.modelo} | $${p.precio_unitario}`).join('\n');
-    let subRest = restantes.reduce((sum, p) => sum + ((p.cantidad_original - p.cantidad_entregada) * p.precio_unitario), 0);
-    let totalRestante = (subRest * (1 - descPct)) * (1 + impPct);
+    let subRestBruto = restantes.reduce((sum, p) => sum + ((p.cantidad_original - p.cantidad_entregada) * p.precio_unitario), 0);
+    let ratioRestante = subBrutoPendiente > 0 ? (subRestBruto / subBrutoPendiente) : 0;
+    ratioRestante = Math.max(0, Math.min(1, ratioRestante));
 
-    let pagoRecibido = parseFloat(datos.pago_recibido) || 0;
-    let nuevoPagado = (datos.pagado_hasta_ahora || 0) + pagoRecibido;
+    let subRestSaldo = subtotalPendienteActual * ratioRestante;
+    let totalRestanteSaldo = totalPendienteActual * ratioRestante;
 
-    let nuevoSaldoTotal = totalRestante - pagoRecibido;
-    let nuevoSaldoSubtotal = subRest - pagoRecibido;
+    // El pago recibido en esta operación reduce el saldo que permanece en la hoja de trabajo.
+    let nuevoSaldoSubtotal = Math.max(0, subRestSaldo - pagoRecibido);
+    let nuevoSaldoTotal = Math.max(0, totalRestanteSaldo - pagoRecibido);
+    let nuevoPagado = Math.max(0, pagadoTotalAcumulado - cuentaEntregada);
 
     const setVal = (header, val) => {
       const idx = headersOrigen.indexOf(header);
@@ -665,13 +710,15 @@ function obtenerDataParaStocks() {
     const colDetalle = headers.indexOf("Detalles");
     const colStock = headers.indexOf("STOCK");
     const colProv = headers.indexOf("Proveedor");
+    const colCat = headers.indexOf("Categoria"); // Nuevo
 
     for (let i = 1; i < data.length; i++) {
       if (colDetalle !== -1 && data[i][colDetalle]) {
         materiales.push({
           nombre: data[i][colDetalle].toString().trim(),
           stock: colStock !== -1 ? parseFloat(data[i][colStock]) || 0 : 0,
-          proveedor: colProv !== -1 ? data[i][colProv].toString().trim() : "Sin Proveedor"
+          proveedor: colProv !== -1 ? data[i][colProv].toString().trim() : "Sin Proveedor",
+          categoria: colCat !== -1 ? data[i][colCat].toString().trim() : "Sin Categoría"
         });
       }
     }
@@ -829,5 +876,451 @@ function normalizarRazonesSociales() {
     SpreadsheetApp.getUi().alert("✅ Éxito", "Se revisaron los clientes y se convirtieron las Razones Sociales a mayúsculas.", SpreadsheetApp.getUi().ButtonSet.OK);
   } else {
     SpreadsheetApp.getUi().alert("ℹ️ Información", "Todas las Razones Sociales ya estaban en mayúsculas.", SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+function manejarConversionMoneda(e) {
+  const sheet = e.range.getSheet();
+  const nombreHoja = sheet.getName();
+  const hojasPermitidas = [CONFIG.HOJA_PEDIDOS, CONFIG.HOJA_TERMINADOS, CONFIG.HOJA_ENTREGADOS];
+
+  if (!hojasPermitidas.includes(nombreHoja)) return;
+
+  const fila = e.range.getRow();
+  if (fila <= CONFIG.FILA_HEADERS) return;
+  // Obtenemos encabezados dinámicamente de la hoja actual
+  const headers = sheet.getRange(CONFIG.FILA_HEADERS, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(h => h.toString().trim().toUpperCase());
+
+  const colMoneda = headers.indexOf("MONEDA") + 1;
+  const colMonedaEstado = headers.indexOf("MONEDA_ESTADO") + 1;
+  const colTC = headers.indexOf("T.C") + 1;
+  const colSubtotal = headers.indexOf("SUBTOTAL") + 1;
+  const colTotal = headers.indexOf("TOTAL") + 1;
+  const colCuenta = headers.indexOf("CUENTA") + 1;
+  const colSaldo = headers.indexOf("SALDO") + 1;
+
+  if (colMoneda === 0 || colMonedaEstado === 0 || colTC === 0 || colSubtotal === 0 || colTotal === 0) return;
+  // Si estamos editando la columna Moneda
+  if (e.range.getColumn() === colMoneda) {
+    const nuevaMoneda = e.value;
+    const estadoActual = sheet.getRange(fila, colMonedaEstado).getValue() || "AR$";
+    if (nuevaMoneda === estadoActual) return; // No hay cambios
+    const tc = parseFloat(sheet.getRange(fila, colTC).getValue()) || 1;
+    let subtotal = parseFloat(sheet.getRange(fila, colSubtotal).getValue()) || 0;
+    let total = parseFloat(sheet.getRange(fila, colTotal).getValue()) || 0;
+    let cuenta = colCuenta > 0 ? (parseFloat(sheet.getRange(fila, colCuenta).getValue()) || 0) : 0;
+    let saldo = colSaldo > 0 ? (parseFloat(sheet.getRange(fila, colSaldo).getValue()) || 0) : 0;
+    // Lógica de conversión
+    if (nuevaMoneda === "U$D" && estadoActual === "AR$") {
+      subtotal /= tc;
+      total /= tc;
+      cuenta /= tc;
+      saldo /= tc;
+    } else if (nuevaMoneda === "AR$" && estadoActual === "U$D") {
+      subtotal *= tc;
+      total *= tc;
+      cuenta *= tc;
+      saldo *= tc;
+    }
+    // Guardar valores y actualizar estado
+    sheet.getRange(fila, colSubtotal).setValue(subtotal);
+    sheet.getRange(fila, colTotal).setValue(total);
+    if (colCuenta > 0) sheet.getRange(fila, colCuenta).setValue(cuenta);
+    if (colSaldo > 0) sheet.getRange(fila, colSaldo).setValue(saldo);
+    sheet.getRange(fila, colMonedaEstado).setValue(nuevaMoneda);
+  }
+}
+
+function iniciarDecisionStockPorEstado(sheet, fila, colEstado, estadoObjetivo, oldValue) {
+  const headers = sheet.getRange(CONFIG.FILA_HEADERS, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(h => h.toString().trim().toUpperCase());
+  const colPedido = headers.indexOf("PEDIDO") + 1;
+  if (colPedido === 0) {
+    SpreadsheetApp.getUi().alert("No se encontró la columna PEDIDO.");
+    return;
+  }
+
+  const detalle = sheet.getRange(fila, colPedido).getValue();
+  const productosPedido = parsearPedidoDetalle(detalle);
+  if (!productosPedido.length) {
+    SpreadsheetApp.getUi().alert("No se pudieron interpretar los productos del pedido.");
+    return;
+  }
+
+  const dataDecision = construirDataDecisionStock(productosPedido);
+  const props = PropertiesService.getScriptProperties();
+  const estadoAnterior = (oldValue || "No Encomendado").toString();
+
+  props.setProperty("DECISION_STOCK_CTX", JSON.stringify({
+    hoja: sheet.getName(),
+    fila,
+    colEstado,
+    estadoObjetivo,
+    estadoAnterior,
+    productosPedido,
+    items: dataDecision.items,
+    ts: Date.now()
+  }));
+
+  props.setProperty('BLOQUEAR_ONEDIT', '1');
+  try {
+    sheet.getRange(fila, colEstado).setValue(estadoAnterior);
+  } finally {
+    props.deleteProperty('BLOQUEAR_ONEDIT');
+  }
+
+  const html = HtmlService.createTemplateFromFile('FormularioDecisionStockEstado');
+  SpreadsheetApp.getUi().showModalDialog(
+    html.evaluate().setWidth(860).setHeight(680),
+    'Decidir fuente de stock'
+  );
+}
+
+function obtenerDataDecisionStockEstado() {
+  const raw = PropertiesService.getScriptProperties().getProperty("DECISION_STOCK_CTX");
+  if (!raw) return null;
+  const ctx = JSON.parse(raw);
+  return {
+    hoja: ctx.hoja,
+    fila: ctx.fila,
+    estadoObjetivo: ctx.estadoObjetivo,
+    items: ctx.items || []
+  };
+}
+
+function aplicarDecisionStockEstado(decisiones) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const raw = props.getProperty("DECISION_STOCK_CTX");
+    if (!raw) throw new Error("No hay una decisión de stock pendiente.");
+    const ctx = JSON.parse(raw);
+
+    const decisionesMap = {};
+    (decisiones || []).forEach(d => {
+      if (d && d.idProducto && d.fuente) decisionesMap[d.idProducto] = d.fuente.toUpperCase();
+    });
+
+    const faltantes = (ctx.productosPedido || []).filter(p => !decisionesMap[p.id]);
+    if (faltantes.length) {
+      throw new Error("Debes elegir una fuente de stock para todos los productos.");
+    }
+
+    descontarStockSegunDecision(ctx.productosPedido || [], decisionesMap);
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const hoja = ss.getSheetByName(ctx.hoja);
+    if (!hoja) throw new Error("No se encontró la hoja del pedido.");
+
+    props.setProperty('BLOQUEAR_ONEDIT', '1');
+    try {
+      hoja.getRange(ctx.fila, ctx.colEstado).setValue(ctx.estadoObjetivo);
+    } finally {
+      props.deleteProperty('BLOQUEAR_ONEDIT');
+    }
+
+    procesarFlujoPedidos(hoja, ctx.fila, ctx.colEstado, ctx.estadoObjetivo);
+    props.deleteProperty("DECISION_STOCK_CTX");
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+function parsearPedidoDetalle(textoPedido) {
+  if (!textoPedido) return [];
+  const ssCostos = obtenerSSCostos();
+  const hojaProds = obtenerHojaProductos(ssCostos);
+  if (!hojaProds) return [];
+
+  const filaHeaders = detectarFilaHeaders(hojaProds);
+  const data = hojaProds.getDataRange().getValues();
+  const headers = data[filaHeaders - 1].map(h => h.toString().trim().toUpperCase());
+  const colId = headers.indexOf("ID");
+  const colCat = headers.indexOf("CATEGORIA");
+  const colMod = headers.indexOf("MODELO");
+
+  return textoPedido.toString().split('\n').map(linea => {
+    const partes = linea.split('|').map(s => s.trim());
+    if (partes.length < 3) return null;
+    const cantidad = parseFloat(partes[0]) || 0;
+    const categoria = partes[1] || "";
+    const modelo = partes[2] || "";
+    if (!cantidad || !modelo) return null;
+
+    const idx = data.findIndex((row, i) =>
+      i >= filaHeaders &&
+      row[colCat] && row[colMod] &&
+      row[colCat].toString().trim().toUpperCase() === categoria.toUpperCase() &&
+      row[colMod].toString().trim().toUpperCase() === modelo.toUpperCase()
+    );
+    if (idx === -1) return null;
+    return {
+      id: data[idx][colId],
+      categoria,
+      modelo,
+      cantidad
+    };
+  }).filter(Boolean);
+}
+
+function construirDataDecisionStock(productosPedido) {
+  const ssCostos = obtenerSSCostos();
+  const hojaProds = obtenerHojaProductos(ssCostos);
+  const hojaMat = ssCostos.getSheetByName(CONFIG.HOJA_MATERIALES);
+  if (!hojaProds || !hojaMat) throw new Error("No se encontraron hojas de Productos/Materiales.");
+
+  const filaHeadersProds = detectarFilaHeaders(hojaProds);
+  const colsP = getColMap(hojaProds, HEADERS_COSTOS, filaHeadersProds);
+  const colsM = getColMap(hojaMat, HEADERS_MATERIALES, 1);
+  const datosP = hojaProds.getDataRange().getValues();
+  const datosM = hojaMat.getDataRange().getValues();
+
+  const items = productosPedido.map(prod => {
+    const filaProdIdx = datosP.findIndex(r => r[colsP.ID - 1] === prod.id);
+    if (filaProdIdx === -1) {
+      return {
+        idProducto: prod.id,
+        nombre: `${prod.categoria} - ${prod.modelo}`,
+        cantidad: prod.cantidad,
+        stockProducto: 0,
+        productoDisponible: false,
+        materiales: [],
+        materialesSuficientes: false
+      };
+    }
+
+    const stockActual = parseFloat(datosP[filaProdIdx][colsP.STOCK - 1]) || 0;
+    const recetaTexto = datosP[filaProdIdx][colsP.MATERIALES - 1] || "";
+    const receta = parsearReceta(recetaTexto);
+
+    let materiales = [];
+    let materialesSuficientes = receta.length > 0;
+    receta.forEach(mat => {
+      const filaMatIdx = datosM.findIndex(r => r[colsM.DETALLES - 1] === mat.nombre);
+      const stockMat = filaMatIdx !== -1 ? (parseFloat(datosM[filaMatIdx][colsM.STOCK - 1]) || 0) : 0;
+      const requerido = (parseFloat(mat.cantidad) || 0) * prod.cantidad;
+      if (stockMat < requerido) materialesSuficientes = false;
+      materiales.push({
+        nombre: mat.nombre,
+        requerido,
+        stock: stockMat
+      });
+    });
+
+    return {
+      idProducto: prod.id,
+      nombre: `${prod.categoria} - ${prod.modelo}`,
+      cantidad: prod.cantidad,
+      stockProducto: stockActual,
+      productoDisponible: stockActual >= prod.cantidad,
+      materiales,
+      materialesSuficientes
+    };
+  });
+
+  return { items };
+}
+
+function descontarStockSegunDecision(productosPedido, decisionesMap) {
+  const ssCostos = obtenerSSCostos();
+  const hojaProds = obtenerHojaProductos(ssCostos);
+  const hojaMat = ssCostos.getSheetByName("Materiales");
+
+  if (!hojaProds || !hojaMat) throw new Error("No se encontraron las hojas de Productos o Materiales.");
+
+  const filaHeadersProds = detectarFilaHeaders(hojaProds);
+  const colsP = getColMap(hojaProds, HEADERS_COSTOS, filaHeadersProds);
+  const colsM = getColMap(hojaMat, HEADERS_MATERIALES, 1);
+
+  const datosP = hojaProds.getDataRange().getValues();
+  const datosM = hojaMat.getDataRange().getValues();
+
+  for (const prod of productosPedido) {
+    if (!prod.id) continue;
+    const decision = (decisionesMap[prod.id] || "").toUpperCase();
+    if (!decision) throw new Error(`Falta decisión para ${prod.categoria} - ${prod.modelo}.`);
+
+    const filaProdIdx = datosP.findIndex(r => r[colsP.ID - 1] === prod.id);
+    if (filaProdIdx === -1) throw new Error(`No se encontró el producto ${prod.categoria} - ${prod.modelo}.`);
+
+    const filaProdSheet = filaProdIdx + 1;
+    const stockActual = parseFloat(datosP[filaProdIdx][colsP.STOCK - 1]) || 0;
+
+    if (decision === "PRODUCTO") {
+      if (stockActual < prod.cantidad) {
+        throw new Error(`Stock insuficiente de producto para ${prod.categoria} - ${prod.modelo}.`);
+      }
+      const nuevoStock = stockActual - prod.cantidad;
+      hojaProds.getRange(filaProdSheet, colsP.STOCK).setValue(nuevoStock);
+      datosP[filaProdIdx][colsP.STOCK - 1] = nuevoStock;
+      continue;
+    }
+
+    if (decision === "MATERIALES") {
+      const recetaTexto = datosP[filaProdIdx][colsP.MATERIALES - 1] || "";
+      const materialesReceta = parsearReceta(recetaTexto);
+      if (!materialesReceta.length) {
+        throw new Error(`El producto ${prod.categoria} - ${prod.modelo} no tiene receta de materiales.`);
+      }
+
+      for (const mat of materialesReceta) {
+        const requerida = mat.cantidad * prod.cantidad;
+        const filaMatIdx = datosM.findIndex(r => r[colsM.DETALLES - 1] === mat.nombre);
+        if (filaMatIdx === -1) throw new Error(`No se encontró el material ${mat.nombre}.`);
+        const stockMatActual = parseFloat(datosM[filaMatIdx][colsM.STOCK - 1]) || 0;
+        if (stockMatActual < requerida) {
+          throw new Error(`Stock insuficiente de material (${mat.nombre}) para ${prod.categoria} - ${prod.modelo}.`);
+        }
+      }
+
+      for (const mat of materialesReceta) {
+        const requerida = mat.cantidad * prod.cantidad;
+        const filaMatIdx = datosM.findIndex(r => r[colsM.DETALLES - 1] === mat.nombre);
+        const filaMatSheet = filaMatIdx + 1;
+        const stockMatActual = parseFloat(datosM[filaMatIdx][colsM.STOCK - 1]) || 0;
+        const nuevoStockMat = stockMatActual - requerida;
+        hojaMat.getRange(filaMatSheet, colsM.STOCK).setValue(nuevoStockMat);
+        datosM[filaMatIdx][colsM.STOCK - 1] = nuevoStockMat;
+      }
+      continue;
+    }
+
+    throw new Error(`Fuente inválida para ${prod.categoria} - ${prod.modelo}.`);
+  }
+}
+
+function abrirModalAlertasStock() {
+  const html = HtmlService.createTemplateFromFile('FormularioAlertasStock');
+  SpreadsheetApp.getUi().showModalDialog(
+    html.evaluate().setWidth(920).setHeight(700),
+    'Gestión de alertas de stock mínimo'
+  );
+}
+
+function obtenerDataAlertasStock() {
+  const materiales = obtenerCatalogoMaterialesAlertas();
+  const config = leerAlertasStockConfig();
+  return {
+    materiales,
+    alertas: config.items || []
+  };
+}
+
+function guardarAlertasStock(items) {
+  const saneadas = (items || [])
+    .filter(i => i && i.material)
+    .map(i => ({
+      material: i.material.toString().trim(),
+      minimo: Math.max(0, parseFloat(i.minimo) || 0)
+    }));
+  const payload = {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    items: saneadas
+  };
+  PropertiesService.getScriptProperties().setProperty("ALERTAS_STOCK_CFG", JSON.stringify(payload));
+  return { success: true };
+}
+
+function eliminarAlertaStock(material) {
+  const cfg = leerAlertasStockConfig();
+  cfg.items = (cfg.items || []).filter(i => i.material !== material);
+  cfg.updatedAt = new Date().toISOString();
+  PropertiesService.getScriptProperties().setProperty("ALERTAS_STOCK_CFG", JSON.stringify(cfg));
+  return { success: true };
+}
+
+function revisarAlertasStock(desdeOnOpen) {
+  const alertas = obtenerAlertasDisparadas();
+  if (!alertas.length) {
+    if (!desdeOnOpen) SpreadsheetApp.getUi().alert("No hay materiales por debajo del stock mínimo configurado.");
+    return { success: true, count: 0 };
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty("ALERTAS_STOCK_LAST", JSON.stringify({
+    ts: Date.now(),
+    rows: alertas
+  }));
+
+  const html = HtmlService.createTemplateFromFile('FormularioRevisionStocks');
+  SpreadsheetApp.getUi().showModalDialog(
+    html.evaluate().setWidth(980).setHeight(680),
+    'Materiales con stock bajo'
+  );
+  return { success: true, count: alertas.length };
+}
+
+function obtenerUltimaRevisionStocks() {
+  const raw = PropertiesService.getScriptProperties().getProperty("ALERTAS_STOCK_LAST");
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed.rows || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function obtenerAlertasDisparadas() {
+  const materiales = obtenerCatalogoMaterialesAlertas();
+  const cfg = leerAlertasStockConfig();
+  const mapaMinimos = {};
+  (cfg.items || []).forEach(i => {
+    mapaMinimos[i.material] = parseFloat(i.minimo) || 0;
+  });
+
+  return materiales
+    .filter(m => mapaMinimos[m.nombre] !== undefined)
+    .map(m => ({
+      nombre: m.nombre,
+      categoria: m.categoria,
+      proveedor: m.proveedor,
+      detalle: m.detalle,
+      stockMinimo: mapaMinimos[m.nombre],
+      stockActual: m.stock
+    }))
+    .filter(r => r.stockActual <= r.stockMinimo);
+}
+
+function obtenerCatalogoMaterialesAlertas() {
+  const ssCostos = obtenerSSCostos();
+  const hojaMat = ssCostos.getSheetByName(CONFIG.HOJA_MATERIALES);
+  if (!hojaMat) return [];
+
+  const data = hojaMat.getDataRange().getValues();
+  if (data.length < 2) return [];
+  const headers = data[0].map(h => h.toString().trim().toUpperCase());
+
+  const colDetalle = headers.indexOf("DETALLES");
+  const colCat = headers.indexOf("CATEGORIA");
+  const colProv = headers.indexOf("PROVEEDOR");
+  const colStock = headers.indexOf("STOCK");
+
+  return data.slice(1)
+    .filter(row => colDetalle !== -1 && row[colDetalle])
+    .map(row => ({
+      nombre: row[colDetalle].toString().trim(),
+      detalle: row[colDetalle].toString().trim(),
+      categoria: colCat !== -1 ? (row[colCat] || "").toString().trim() : "",
+      proveedor: colProv !== -1 ? (row[colProv] || "").toString().trim() : "",
+      stock: colStock !== -1 ? (parseFloat(row[colStock]) || 0) : 0
+    }));
+}
+
+function leerAlertasStockConfig() {
+  const raw = PropertiesService.getScriptProperties().getProperty("ALERTAS_STOCK_CFG");
+  if (!raw) return { version: 1, updatedAt: null, items: [] };
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      version: parsed.version || 1,
+      updatedAt: parsed.updatedAt || null,
+      items: Array.isArray(parsed.items) ? parsed.items : []
+    };
+  } catch (e) {
+    return { version: 1, updatedAt: null, items: [] };
   }
 }

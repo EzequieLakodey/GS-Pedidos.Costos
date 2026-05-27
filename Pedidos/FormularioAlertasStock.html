@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 14px; background: #f8fafc; }
+    .toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+    input, button { padding: 8px; border-radius: 8px; border: 1px solid #d1d5db; }
+    button { border: 0; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-secondary { background: #e5e7eb; color: #111827; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; font-size: 13px; text-align: left; }
+    th { background: #f3f4f6; }
+    .min-input { width: 100px; }
+  </style>
+</head>
+<body>
+  <h3>Alertas de stock mínimo (Materiales)</h3>
+  <div class="toolbar">
+    <input id="search" placeholder="Buscar material..." oninput="render()">
+    <button class="btn-secondary" onclick="google.script.host.close()">Cerrar</button>
+    <button class="btn-primary" onclick="guardar()">Guardar alertas</button>
+  </div>
+  <div id="content">Cargando...</div>
+
+  <script>
+    let materiales = [];
+    let minimos = {};
+
+    window.onload = () => {
+      google.script.run
+        .withSuccessHandler(data => {
+          materiales = data.materiales || [];
+          (data.alertas || []).forEach(a => minimos[a.material] = a.minimo);
+          render();
+        })
+        .withFailureHandler(err => {
+          document.getElementById('content').innerHTML = 'Error: ' + err.message;
+        })
+        .obtenerDataAlertasStock();
+    };
+
+    function render() {
+      const q = document.getElementById('search').value.toLowerCase().trim();
+      const filtered = materiales.filter(m =>
+        !q ||
+        m.nombre.toLowerCase().includes(q) ||
+        (m.categoria || '').toLowerCase().includes(q) ||
+        (m.proveedor || '').toLowerCase().includes(q)
+      );
+
+      const html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Material</th>
+              <th>Categoría</th>
+              <th>Proveedor</th>
+              <th>Stock actual</th>
+              <th>Stock mínimo (alerta)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map(m => `
+              <tr>
+                <td>${m.nombre}</td>
+                <td>${m.categoria || '-'}</td>
+                <td>${m.proveedor || '-'}</td>
+                <td>${(m.stock || 0).toFixed(2)}</td>
+                <td><input class="min-input" type="number" min="0" step="0.01" value="${minimos[m.nombre] ?? ''}" oninput="setMin('${escapeStr(m.nombre)}', this.value)"></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+      document.getElementById('content').innerHTML = html;
+    }
+
+    function escapeStr(s) {
+      return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    function setMin(material, value) {
+      if (value === '' || value === null) {
+        delete minimos[material];
+        return;
+      }
+      minimos[material] = parseFloat(value) || 0;
+    }
+
+    function guardar() {
+      const items = Object.keys(minimos).map(material => ({ material, minimo: minimos[material] }))
+        .filter(i => i.minimo !== null && i.minimo !== undefined && !Number.isNaN(i.minimo));
+      google.script.run
+        .withSuccessHandler(() => {
+          alert('Alertas guardadas.');
+          google.script.host.close();
+        })
+        .withFailureHandler(err => alert('Error: ' + err.message))
+        .guardarAlertasStock(items);
+    }
+  </script>
+</body>
+</html>

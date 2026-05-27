@@ -1,13 +1,21 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <base target="_top">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
         :root {
             --primary: #059669;
@@ -24,7 +32,7 @@
             --text-3: #94a3b8;
             --radius: 12px;
             --radius-sm: 8px;
-            --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 8px 24px rgba(5,150,105,0.06);
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.07), 0 8px 24px rgba(5, 150, 105, 0.06);
             --transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
@@ -37,216 +45,406 @@
             line-height: 1.5;
         }
 
-        .page-wrapper { max-width: 740px; margin: 0 auto; }
+        .page-wrapper {
+            max-width: 740px;
+            margin: 0 auto;
+        }
 
         .page-header {
-            display: flex; align-items: center; gap: 10px; margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
         }
+
         .page-header .icon {
-            width: 40px; height: 40px;
+            width: 40px;
+            height: 40px;
             background: linear-gradient(135deg, var(--primary), var(--accent));
-            border-radius: 10px; display: flex; align-items: center; justify-content: center;
-            font-size: 18px; box-shadow: 0 4px 12px rgba(5,150,105,0.3);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
         }
-        .page-header h1 { font-size: 1.15rem; font-weight: 700; }
-        .page-header p  { font-size: 0.78rem; color: var(--text-2); }
+
+        .page-header h1 {
+            font-size: 1.15rem;
+            font-weight: 700;
+        }
+
+        .page-header p {
+            font-size: 0.78rem;
+            color: var(--text-2);
+        }
 
         .card {
-            background: var(--surface); border: 1px solid var(--border-base);
-            border-radius: var(--radius); box-shadow: var(--shadow);
-            padding: 18px 20px; margin-bottom: 14px;
+            background: var(--surface);
+            border: 1px solid var(--border-base);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 18px 20px;
+            margin-bottom: 14px;
         }
+
         .card-title {
-            font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 0.7px; color: var(--primary); margin-bottom: 14px;
-            padding-bottom: 8px; border-bottom: 1.5px solid var(--border);
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            color: var(--primary);
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1.5px solid var(--border);
         }
 
         /* Info badges grid */
-        .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        .info-tile {
-            background: var(--surface-2); border: 1px solid var(--border);
-            border-radius: var(--radius-sm); padding: 10px 12px;
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
         }
-        .info-tile .info-label { font-size: 0.7rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-        .info-tile .info-value { font-size: 0.95rem; font-weight: 700; color: var(--text); }
-        .info-tile .info-value.accent { color: var(--primary); }
+
+        .info-tile {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+        }
+
+        .info-tile .info-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .info-tile .info-value {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .info-tile .info-value.accent {
+            color: var(--primary);
+        }
 
         /* Product rows */
         .product-row {
-            background: var(--surface-2); border: 1.5px solid var(--border);
-            border-radius: var(--radius); padding: 14px 16px;
-            margin-bottom: 10px; transition: var(--transition);
-            display: grid; grid-template-columns: 5fr 1.5fr 1.5fr 2fr; gap: 10px; align-items: center;
+            background: var(--surface-2);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            transition: var(--transition);
+            display: grid;
+            grid-template-columns: 5fr 1.5fr 1.5fr 2fr;
+            gap: 10px;
+            align-items: center;
         }
-        .product-row:hover { border-color: var(--primary-light); box-shadow: 0 4px 16px rgba(5,150,105,0.08); }
-        .prod-name-block .prod-title { font-weight: 700; font-size: 0.9rem; color: var(--text); }
-        .prod-name-block .prod-sub   { font-size: 0.75rem; color: var(--text-2); margin-top: 2px; }
-        .prod-stat { text-align: center; }
-        .prod-stat .stat-label { font-size: 0.68rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
-        .prod-stat .stat-value { font-size: 0.95rem; font-weight: 700; }
 
-        label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-2); margin-bottom: 5px; letter-spacing: 0.2px; }
-        input[type="number"], input[type="text"] {
-            width: 100%; padding: 8px 11px; border: 1.5px solid var(--border-base);
-            border-radius: var(--radius-sm); font-family: 'Inter', sans-serif;
-            font-size: 13.5px; color: var(--text); background: var(--surface);
-            transition: var(--transition); outline: none;
+        .product-row:hover {
+            border-color: var(--primary-light);
+            box-shadow: 0 4px 16px rgba(5, 150, 105, 0.08);
         }
-        input:focus { border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(52,211,153,0.15); }
+
+        .prod-name-block .prod-title {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+
+        .prod-name-block .prod-sub {
+            font-size: 0.75rem;
+            color: var(--text-2);
+            margin-top: 2px;
+        }
+
+        .prod-stat {
+            text-align: center;
+        }
+
+        .prod-stat .stat-label {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--text-3);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 3px;
+        }
+
+        .prod-stat .stat-value {
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-2);
+            margin-bottom: 5px;
+            letter-spacing: 0.2px;
+        }
+
+        input[type="number"],
+        input[type="text"] {
+            width: 100%;
+            padding: 8px 11px;
+            border: 1.5px solid var(--border-base);
+            border-radius: var(--radius-sm);
+            font-family: 'Inter', sans-serif;
+            font-size: 13.5px;
+            color: var(--text);
+            background: var(--surface);
+            transition: var(--transition);
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15);
+        }
 
         /* Totals */
         .totals-box {
             background: linear-gradient(135deg, #0f172a, #052e16);
-            border-radius: var(--radius); padding: 20px 22px;
-            color: #e2e8f0; box-shadow: 0 8px 30px rgba(15,23,42,0.2);
+            border-radius: var(--radius);
+            padding: 20px 22px;
+            color: #e2e8f0;
+            box-shadow: 0 8px 30px rgba(15, 23, 42, 0.2);
             margin-bottom: 14px;
         }
+
         .totals-line {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 5px 0; font-size: 0.88rem; opacity: 0.85;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            font-size: 0.88rem;
+            opacity: 0.85;
         }
-        .totals-line + .totals-line { border-top: 1px solid rgba(255,255,255,0.07); }
-        .totals-line.grand { opacity: 1; padding-top: 14px; margin-top: 6px; border-top: 1.5px solid rgba(255,255,255,0.15) !important; }
-        .totals-line.grand .lbl { font-size: 0.95rem; font-weight: 700; color: #fff; }
-        .totals-line.grand .val { font-size: 1.4rem; font-weight: 800; color: var(--primary-light); }
-        .totals-line .val.yellow { color: #fbbf24; }
+
+        .totals-line+.totals-line {
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .totals-line.grand {
+            opacity: 1;
+            padding-top: 14px;
+            margin-top: 6px;
+            border-top: 1.5px solid rgba(255, 255, 255, 0.15) !important;
+        }
+
+        .totals-line.grand .lbl {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .totals-line.grand .val {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--primary-light);
+        }
+
+        .totals-line .val.yellow {
+            color: #fbbf24;
+        }
 
         /* Buttons */
         .btn {
-            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-            padding: 9px 16px; border-radius: var(--radius-sm); border: none;
-            font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
-            cursor: pointer; transition: var(--transition); outline: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 16px;
+            border-radius: var(--radius-sm);
+            border: none;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            outline: none;
         }
+
         .btn-primary {
             background: linear-gradient(135deg, var(--primary), var(--accent));
-            color: white; box-shadow: 0 4px 12px rgba(5,150,105,0.25);
+            color: white;
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
         }
-        .btn-primary:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(5,150,105,0.4); transform: translateY(-1px); }
-        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-        .btn-full { width: 100%; padding: 13px; font-size: 14px; border-radius: 10px; letter-spacing: 0.3px; }
+
+        .btn-primary:hover:not(:disabled) {
+            box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-full {
+            width: 100%;
+            padding: 13px;
+            font-size: 14px;
+            border-radius: 10px;
+            letter-spacing: 0.3px;
+        }
 
         .spinner {
-            width: 16px; height: 16px; border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
-            animation: spin 0.7s linear infinite; display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            animation: spin 0.7s linear infinite;
+            display: inline-block;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
 
         .alert-err {
-            background: #fee2e2; border: 1.5px solid #fca5a5; border-radius: 10px;
-            padding: 12px 16px; color: #991b1b; font-size: 13px; font-weight: 500; margin-bottom: 14px;
+            background: #fee2e2;
+            border: 1.5px solid #fca5a5;
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: #991b1b;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 14px;
         }
+
         .loading-state {
-            text-align: center; padding: 32px; color: var(--text-3); font-size: 0.88rem;
+            text-align: center;
+            padding: 32px;
+            color: var(--text-3);
+            font-size: 0.88rem;
         }
-        .loading-state .spinner { border-top-color: var(--primary); border-color: var(--border); margin: 0 auto 10px; display: block; width: 24px; height: 24px; }
+
+        .loading-state .spinner {
+            border-top-color: var(--primary);
+            border-color: var(--border);
+            margin: 0 auto 10px;
+            display: block;
+            width: 24px;
+            height: 24px;
+        }
     </style>
 </head>
+
 <body>
-<div class="page-wrapper">
+    <div class="page-wrapper">
 
-    <div class="page-header">
-        <div class="icon">📦</div>
-        <div>
-            <h1>Entrega Parcial de Pedido</h1>
-            <p>Selecciona las cantidades a entregar y registra el pago recibido</p>
-        </div>
-    </div>
-
-    <!-- Info del pedido -->
-    <div class="card">
-        <div class="card-title">📋 Datos del Pedido</div>
-        <div class="info-grid">
-            <div class="info-tile">
-                <div class="info-label">Cliente</div>
-                <div class="info-value accent" id="info_cliente">—</div>
-            </div>
-            <div class="info-tile">
-                <div class="info-label">Subtotal (saldo)</div>
-                <div class="info-value" id="info_subtotal">—</div>
-            </div>
-            <div class="info-tile">
-                <div class="info-label">Total (saldo)</div>
-                <div class="info-value" id="info_total">—</div>
-            </div>
-            <div class="info-tile">
-                <div class="info-label">Ya pagado</div>
-                <div class="info-value" id="info_pagado">—</div>
+        <div class="page-header">
+            <div class="icon">📦</div>
+            <div>
+                <h1>Entrega Parcial de Pedido</h1>
+                <p>Selecciona las cantidades a entregar y registra el pago recibido</p>
             </div>
         </div>
-    </div>
 
-    <!-- Productos -->
-    <div class="card">
-        <div class="card-title">🛒 Productos a Entregar</div>
-        <div id="contenedor-productos">
-            <div class="loading-state">
-                <div class="spinner"></div>
-                Cargando datos del pedido...
+        <!-- Info del pedido -->
+        <div class="card">
+            <div class="card-title">📋 Datos del Pedido</div>
+            <div class="info-grid">
+                <div class="info-tile">
+                    <div class="info-label">Cliente</div>
+                    <div class="info-value accent" id="info_cliente">—</div>
+                </div>
+                <div class="info-tile">
+                    <div class="info-label">Subtotal (saldo)</div>
+                    <div class="info-value" id="info_subtotal">—</div>
+                </div>
+                <div class="info-tile">
+                    <div class="info-label">Total (saldo)</div>
+                    <div class="info-value" id="info_total">—</div>
+                </div>
+                <div class="info-tile">
+                    <div class="info-label">Ya pagado</div>
+                    <div class="info-value" id="info_pagado">—</div>
+                </div>
             </div>
         </div>
+
+        <!-- Productos -->
+        <div class="card">
+            <div class="card-title">🛒 Productos a Entregar</div>
+            <div id="contenedor-productos">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    Cargando datos del pedido...
+                </div>
+            </div>
+        </div>
+
+        <!-- Pago recibido -->
+        <div class="card">
+            <div class="card-title">💰 Pago en esta Entrega</div>
+            <div style="max-width:280px;">
+                <label>Monto recibido ahora</label>
+                <input type="number" id="pago_recibido" value="0" step="0.01" min="0" oninput="calcularResumen()">
+            </div>
+        </div>
+
+        <!-- Resumen -->
+        <div class="totals-box">
+            <div class="totals-line">
+                <span class="lbl">Valor entregado (subtotal):</span>
+                <span class="val" id="lbl_sub_entregado">$0,00</span>
+            </div>
+            <div class="totals-line">
+                <span class="lbl">Valor entregado (con imp. y dto.):</span>
+                <span class="val" id="lbl_total_entregado">$0,00</span>
+            </div>
+            <div class="totals-line">
+                <span class="lbl">Pago recibido ahora:</span>
+                <span class="val yellow" id="lbl_pago_ahora">$0,00</span>
+            </div>
+            <div class="totals-line grand">
+                <span class="lbl">Nuevo saldo pendiente:</span>
+                <span class="val" id="lbl_pendiente">$0,00</span>
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-full" id="btnConfirmar" onclick="confirmarEntrega()">
+            ✅ CONFIRMAR ENTREGA PARCIAL
+        </button>
+        <div style="height:16px;"></div>
     </div>
 
-    <!-- Pago recibido -->
-    <div class="card">
-        <div class="card-title">💰 Pago en esta Entrega</div>
-        <div style="max-width:280px;">
-            <label>Monto recibido ahora</label>
-            <input type="number" id="pago_recibido" value="0" step="0.01" min="0" oninput="calcularResumen()">
-        </div>
-    </div>
+    <script>
+        let PEDIDO = null;
 
-    <!-- Resumen -->
-    <div class="totals-box">
-        <div class="totals-line">
-            <span class="lbl">Valor entregado (subtotal):</span>
-            <span class="val" id="lbl_sub_entregado">$0,00</span>
-        </div>
-        <div class="totals-line">
-            <span class="lbl">Valor entregado (con imp. y dto.):</span>
-            <span class="val" id="lbl_total_entregado">$0,00</span>
-        </div>
-        <div class="totals-line">
-            <span class="lbl">Pago recibido ahora:</span>
-            <span class="val yellow" id="lbl_pago_ahora">$0,00</span>
-        </div>
-        <div class="totals-line grand">
-            <span class="lbl">Nuevo saldo pendiente:</span>
-            <span class="val" id="lbl_pendiente">$0,00</span>
-        </div>
-    </div>
+        const fmtARS = (v) => v.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
 
-    <button type="button" class="btn btn-primary btn-full" id="btnConfirmar" onclick="confirmarEntrega()">
-        ✅ CONFIRMAR ENTREGA PARCIAL
-    </button>
-    <div style="height:16px;"></div>
-</div>
+        window.onload = () => {
+            google.script.run
+                .withSuccessHandler(data => {
+                    if (!data) {
+                        document.getElementById('contenedor-productos').innerHTML =
+                            '<div class="alert-err">⚠️ No se pudieron obtener los datos del pedido.</div>';
+                        return;
+                    }
+                    PEDIDO = data;
 
-<script>
-    let PEDIDO = null;
+                    document.getElementById('info_cliente').innerText = data.cliente || '—';
+                    document.getElementById('info_subtotal').innerText = fmtARS(data.subtotal || 0);
+                    document.getElementById('info_total').innerText = fmtARS(data.total || 0);
+                    document.getElementById('info_pagado').innerText = fmtARS(data.pagado_hasta_ahora || 0);
 
-    const fmtARS = (v) => v.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
-
-    window.onload = () => {
-        google.script.run
-            .withSuccessHandler(data => {
-                if (!data) {
-                    document.getElementById('contenedor-productos').innerHTML =
-                        '<div class="alert-err">⚠️ No se pudieron obtener los datos del pedido.</div>';
-                    return;
-                }
-                PEDIDO = data;
-
-                document.getElementById('info_cliente').innerText = data.cliente || '—';
-                document.getElementById('info_subtotal').innerText = fmtARS(data.subtotal || 0);
-                document.getElementById('info_total').innerText = fmtARS(data.total || 0);
-                document.getElementById('info_pagado').innerText = fmtARS(data.pagado_hasta_ahora || 0);
-
-                let html = '';
-                data.productos.forEach((p, i) => {
-                    html += `
+                    let html = '';
+                    data.productos.forEach((p, i) => {
+                        html += `
                     <div class="product-row">
                         <div class="prod-name-block">
                             <div class="prod-title">${p.categoria} — ${p.modelo}</div>
@@ -267,78 +465,86 @@
                                    oninput="calcularResumen()">
                         </div>
                     </div>`;
+                    });
+                    document.getElementById('contenedor-productos').innerHTML = html;
+                    calcularResumen();
+                })
+                .withFailureHandler(err => {
+                    document.getElementById('contenedor-productos').innerHTML =
+                        `<div class="alert-err">⚠️ Error al cargar datos: ${err.message}</div>`;
+                })
+                .obtenerDatosPedidoParcial();
+        };
+
+        function calcularResumen() {
+            if (!PEDIDO) return;
+            let subEntregado = 0;
+            document.querySelectorAll('.ep-qty').forEach(inp => {
+                let idx = parseInt(inp.dataset.idx);
+                let cant = parseFloat(inp.value) || 0;
+                const max = PEDIDO.productos[idx].cantidad;
+                if (cant > max) { inp.value = max; cant = max; }
+                if (cant < 0) { inp.value = 0; cant = 0; }
+                subEntregado += cant * PEDIDO.productos[idx].precio_unitario;
+            });
+
+            const descPct = PEDIDO.descuento_pct || 0;
+            const impPct = PEDIDO.impuesto_pct || 0;
+            const subConDesc = subEntregado * (1 - descPct);
+            const totalEntregado = subConDesc * (1 + impPct);
+
+            let subRestante = 0;
+            document.querySelectorAll('.ep-qty').forEach(inp => {
+                const idx = parseInt(inp.dataset.idx);
+                const cant = parseFloat(inp.value) || 0;
+                subRestante += (PEDIDO.productos[idx].cantidad - cant) * PEDIDO.productos[idx].precio_unitario;
+            });
+            const totalRestante = subRestante * (1 - descPct) * (1 + impPct);
+            const pagoAhora = parseFloat(document.getElementById('pago_recibido').value) || 0;
+            const nuevoSaldo = totalRestante - pagoAhora;
+
+            document.getElementById('lbl_sub_entregado').innerText = fmtARS(subEntregado);
+            document.getElementById('lbl_total_entregado').innerText = fmtARS(totalEntregado);
+            document.getElementById('lbl_pago_ahora').innerText = fmtARS(pagoAhora);
+            document.getElementById('lbl_pendiente').innerText = fmtARS(nuevoSaldo);
+        }
+
+        function confirmarEntrega() {
+            if (!PEDIDO) return;
+            let productos_entregados = [];
+            let hayAlgo = false;
+            document.querySelectorAll('.ep-qty').forEach(inp => {
+                const idx = parseInt(inp.dataset.idx);
+                const cant = parseFloat(inp.value) || 0;
+                const p = PEDIDO.productos[idx];
+                productos_entregados.push({ cantidad_original: p.cantidad, cantidad_entregada: cant, categoria: p.categoria, modelo: p.modelo, precio_unitario: p.precio_unitario });
+                if (cant > 0) hayAlgo = true;
+            });
+            if (!hayAlgo) { alert('Debes indicar al menos un producto con cantidad > 0 para entregar.'); return; }
+
+            const btn = document.getElementById('btnConfirmar');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> PROCESANDO...';
+
+            google.script.run
+                .withSuccessHandler(resp => {
+                    if (resp.success) { google.script.host.close(); }
+                    else { alert('Error: ' + resp.message); btn.disabled = false; btn.innerHTML = '✅ CONFIRMAR ENTREGA PARCIAL'; }
+                })
+                .withFailureHandler(err => {
+                    alert(err.message);
+                    btn.disabled = false; btn.innerHTML = '✅ CONFIRMAR ENTREGA PARCIAL';
+                })
+                .guardarEntregaParcial({
+                    fila: PEDIDO.fila,
+                    hoja_origen: PEDIDO.hoja_origen,
+                    productos_entregados,
+                    pago_recibido: parseFloat(document.getElementById('pago_recibido').value) || 0,
+                    pagado_hasta_ahora: PEDIDO.pagado_hasta_ahora,
+                    tc: PEDIDO.tc
                 });
-                document.getElementById('contenedor-productos').innerHTML = html;
-                calcularResumen();
-            })
-            .withFailureHandler(err => {
-                document.getElementById('contenedor-productos').innerHTML =
-                    `<div class="alert-err">⚠️ Error al cargar datos: ${err.message}</div>`;
-            })
-            .obtenerDatosPedidoParcial();
-    };
-
-    function calcularResumen() {
-        if (!PEDIDO) return;
-        let subEntregado = 0;
-        document.querySelectorAll('.ep-qty').forEach(inp => {
-            let idx = parseInt(inp.dataset.idx);
-            let cant = parseFloat(inp.value) || 0;
-            const max = PEDIDO.productos[idx].cantidad;
-            if (cant > max) { inp.value = max; cant = max; }
-            if (cant < 0)  { inp.value = 0; cant = 0; }
-            subEntregado += cant * PEDIDO.productos[idx].precio_unitario;
-        });
-
-        const descPct = PEDIDO.descuento_pct || 0;
-        const impPct  = PEDIDO.impuesto_pct  || 0;
-        const subConDesc = subEntregado * (1 - descPct);
-        const totalEntregado = subConDesc * (1 + impPct);
-
-        let subRestante = 0;
-        document.querySelectorAll('.ep-qty').forEach(inp => {
-            const idx = parseInt(inp.dataset.idx);
-            const cant = parseFloat(inp.value) || 0;
-            subRestante += (PEDIDO.productos[idx].cantidad - cant) * PEDIDO.productos[idx].precio_unitario;
-        });
-        const totalRestante = subRestante * (1 - descPct) * (1 + impPct);
-        const pagoAhora = parseFloat(document.getElementById('pago_recibido').value) || 0;
-        const nuevoSaldo = totalRestante - pagoAhora;
-
-        document.getElementById('lbl_sub_entregado').innerText   = fmtARS(subEntregado);
-        document.getElementById('lbl_total_entregado').innerText = fmtARS(totalEntregado);
-        document.getElementById('lbl_pago_ahora').innerText      = fmtARS(pagoAhora);
-        document.getElementById('lbl_pendiente').innerText       = fmtARS(nuevoSaldo);
-    }
-
-    function confirmarEntrega() {
-        if (!PEDIDO) return;
-        let productos_entregados = [];
-        let hayAlgo = false;
-        document.querySelectorAll('.ep-qty').forEach(inp => {
-            const idx = parseInt(inp.dataset.idx);
-            const cant = parseFloat(inp.value) || 0;
-            const p = PEDIDO.productos[idx];
-            productos_entregados.push({ cantidad_original: p.cantidad, cantidad_entregada: cant, categoria: p.categoria, modelo: p.modelo, precio_unitario: p.precio_unitario });
-            if (cant > 0) hayAlgo = true;
-        });
-        if (!hayAlgo) { alert('Debes indicar al menos un producto con cantidad > 0 para entregar.'); return; }
-
-        const btn = document.getElementById('btnConfirmar');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> PROCESANDO...';
-
-        google.script.run
-            .withSuccessHandler(resp => {
-                if (resp.success) { google.script.host.close(); }
-                else { alert('Error: ' + resp.message); btn.disabled = false; btn.innerHTML = '✅ CONFIRMAR ENTREGA PARCIAL'; }
-            })
-            .withFailureHandler(err => {
-                alert(err.message);
-                btn.disabled = false; btn.innerHTML = '✅ CONFIRMAR ENTREGA PARCIAL';
-            })
-            .guardarEntregaParcial({ fila: PEDIDO.fila, productos_entregados, pago_recibido: parseFloat(document.getElementById('pago_recibido').value) || 0, pagado_hasta_ahora: PEDIDO.pagado_hasta_ahora, tc: PEDIDO.tc });
-    }
-</script>
+        }
+    </script>
 </body>
+
 </html>

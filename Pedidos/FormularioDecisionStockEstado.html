@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 14px; background: #f8fafc; color: #1f2937; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+    .title { font-weight: 700; margin-bottom: 4px; }
+    .meta { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+    .ok { color: #047857; font-size: 12px; }
+    .bad { color: #b91c1c; font-size: 12px; }
+    .mats { font-size: 12px; margin-top: 6px; background: #f9fafb; border-radius: 8px; padding: 8px; }
+    .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+    button { border: 0; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 600; }
+    .btn-cancel { background: #e5e7eb; color: #111827; }
+    .btn-save { background: #2563eb; color: #fff; }
+    .disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h3>Seleccionar fuente de stock</h3>
+  <div id="meta"></div>
+  <div id="rows">Cargando...</div>
+  <div class="actions">
+    <button class="btn-cancel" onclick="google.script.host.close()">Cancelar</button>
+    <button id="btnSave" class="btn-save" onclick="guardar()">Aplicar y continuar</button>
+  </div>
+
+  <script>
+    let DATA = null;
+    const choices = {};
+
+    window.onload = () => {
+      google.script.run
+        .withSuccessHandler(render)
+        .withFailureHandler(err => alert("Error: " + err.message))
+        .obtenerDataDecisionStockEstado();
+    };
+
+    function render(data) {
+      if (!data || !data.items || !data.items.length) {
+        document.getElementById('rows').innerHTML = '<div class="card">No hay productos pendientes de decisión.</div>';
+        document.getElementById('btnSave').classList.add('disabled');
+        document.getElementById('btnSave').disabled = true;
+        return;
+      }
+      DATA = data;
+      document.getElementById('meta').innerHTML = `<div class="meta">Fila ${data.fila} - Estado objetivo: <b>${data.estadoObjetivo}</b></div>`;
+      const rows = data.items.map((it, i) => {
+        const mats = (it.materiales || []).map(m =>
+          `<div>${m.nombre}: requerido ${m.requerido.toFixed(2)} | stock ${m.stock.toFixed(2)}</div>`
+        ).join('');
+        return `
+          <div class="card">
+            <div class="title">${it.nombre}</div>
+            <div class="meta">Cantidad: ${it.cantidad} | Stock producto: ${it.stockProducto}</div>
+            <div class="${it.productoDisponible ? 'ok' : 'bad'}">
+              Producto ${it.productoDisponible ? 'disponible' : 'insuficiente'}
+            </div>
+            <div class="${it.materialesSuficientes ? 'ok' : 'bad'}">
+              Materiales ${it.materialesSuficientes ? 'suficientes' : 'insuficientes'}
+            </div>
+            <div class="mats">${mats || 'Sin receta de materiales'}</div>
+            <div style="margin-top:8px;">
+              <label><input type="radio" name="src_${i}" value="PRODUCTO" onchange="setChoice('${it.idProducto}', this.value)"> Usar stock de producto</label>
+              <label style="margin-left:14px;"><input type="radio" name="src_${i}" value="MATERIALES" onchange="setChoice('${it.idProducto}', this.value)"> Usar materiales para producir</label>
+            </div>
+          </div>
+        `;
+      }).join('');
+      document.getElementById('rows').innerHTML = rows;
+    }
+
+    function setChoice(idProducto, value) {
+      choices[idProducto] = value;
+    }
+
+    function guardar() {
+      if (!DATA) return;
+      const decisiones = DATA.items.map(it => ({ idProducto: it.idProducto, fuente: choices[it.idProducto] }));
+      const incompletas = decisiones.some(d => !d.fuente);
+      if (incompletas) {
+        alert("Debes seleccionar una fuente para todos los productos.");
+        return;
+      }
+
+      const btn = document.getElementById('btnSave');
+      btn.disabled = true;
+      btn.textContent = 'Aplicando...';
+
+      google.script.run
+        .withSuccessHandler(resp => {
+          if (resp && resp.success) {
+            google.script.host.close();
+            return;
+          }
+          alert((resp && resp.message) || 'No se pudo aplicar la decisión.');
+          btn.disabled = false;
+          btn.textContent = 'Aplicar y continuar';
+        })
+        .withFailureHandler(err => {
+          alert(err.message);
+          btn.disabled = false;
+          btn.textContent = 'Aplicar y continuar';
+        })
+        .aplicarDecisionStockEstado(decisiones);
+    }
+  </script>
+</body>
+</html>
