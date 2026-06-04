@@ -220,11 +220,11 @@
                 <label class="form-label d-block">Moneda de Precios</label>
                 <div class="btn-group w-100" role="group">
                     <input type="radio" class="btn-check" name="moneda" id="moneda_ars" value="ARS" checked
-                        onchange="calcularTotales()">
+                        onchange="cambiarMonedaGeneral(); calcularTotales()">
                     <label class="btn btn-outline-primary" for="moneda_ars">Pesos (ARS)</label>
 
                     <input type="radio" class="btn-check" name="moneda" id="moneda_usd" value="USD"
-                        onchange="calcularTotales()">
+                        onchange="cambiarMonedaGeneral(); calcularTotales()">
                     <label class="btn btn-outline-primary" for="moneda_usd">Dólares (USD)</label>
                 </div>
             </div>
@@ -389,6 +389,7 @@
 
                     // Add first empty product row
                     agregarProducto();
+                    cambiarMonedaGeneral();
                 })
                 .withFailureHandler(err => {
                     alert("ERROR DE PERMISOS O SISTEMA: " + err.message + "\nRecuerda ejecutar 'instalarTodoElSistema' en el editor.");
@@ -482,7 +483,14 @@
         </div>
         <div class="col-md-3">
           <label class="form-label small text-muted mb-1">Precio U.</label>
-          <input type="number" class="form-control prod-price bg-light" placeholder="0.00" step="0.01" oninput="calcularTotales()" readonly>
+          <div class="input-group input-group-sm mb-1">
+            <span class="input-group-text bg-success text-white border-success" style="width: 45px;">USD</span>
+            <input type="number" class="form-control prod-price-usd border-success" style="background-color: #d1fae5 !important;" placeholder="0.00" step="0.01" oninput="sincronizarPrecio(this, 'USD'); calcularTotales();" readonly>
+          </div>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-info text-white border-info" style="width: 45px;">ARS</span>
+            <input type="number" class="form-control prod-price-ars border-info" style="background-color: #e0f2fe !important;" placeholder="0.00" step="0.01" oninput="sincronizarPrecio(this, 'ARS'); calcularTotales();" readonly>
+          </div>
         </div>
         <div class="col-md-4 d-flex gap-2">
           <div class="w-100">
@@ -516,24 +524,36 @@
             });
         }
 
-        function actualizarPrecioYCalcular(rowId) {
+        function actualizarPrecioYCalcular(rowId, forceRecalc = false) {
             const row = document.getElementById('prod_' + rowId);
             if (!row) return;
             const nombre = row.querySelector('.prod-name').value;
             const currentSelected = row.dataset.selectedProd || "";
-            if (nombre !== currentSelected) {
+            if (nombre !== currentSelected || forceRecalc) {
                 const prodItem = CATALOGO.find(p => p.nombre === nombre);
                 if (prodItem) {
                     const priceType = row.querySelector('.prod-price-type').value;
-                    const priceInput = row.querySelector('.prod-price');
+                    const inputUsd = row.querySelector('.prod-price-usd');
+                    const inputArs = row.querySelector('.prod-price-ars');
+                    
+                    let usdPrice = (priceType === "PRECIO") ? (prodItem.precio || 0) : (prodItem.ultimoPrecio || prodItem.precio || 0);
+                    const tc = parseFloat(document.getElementById('tc_valor').value) || 1;
+                    const monedaGeneral = document.querySelector('input[name="moneda"]:checked').value;
+                    
+                    inputUsd.value = usdPrice.toFixed(2);
+                    inputArs.value = (usdPrice * tc).toFixed(2);
+
                     if (priceType === "PRECIO") {
-                        priceInput.value = prodItem.precio || 0;
-                        priceInput.readOnly = true;
-                        priceInput.classList.add('bg-light');
+                        inputUsd.readOnly = true;
+                        inputArs.readOnly = true;
                     } else {
-                        priceInput.value = prodItem.ultimoPrecio || prodItem.precio || 0;
-                        priceInput.readOnly = false;
-                        priceInput.classList.remove('bg-light');
+                        if (monedaGeneral === 'USD') {
+                            inputUsd.readOnly = false;
+                            inputArs.readOnly = true;
+                        } else {
+                            inputUsd.readOnly = true;
+                            inputArs.readOnly = false;
+                        }
                     }
                     row.dataset.selectedProd = nombre;
                 }
@@ -543,29 +563,31 @@
         }
 
         function cambiarTipoPrecio(rowId) {
-            const row = document.getElementById('prod_' + rowId);
+            actualizarPrecioYCalcular(rowId, true);
+        }
+
+        function cambiarMonedaGeneral() {
+            document.querySelectorAll('.product-row').forEach(row => {
+                const id = row.id.split('_')[1];
+                actualizarPrecioYCalcular(id, true);
+            });
+        }
+
+        function sincronizarPrecio(element, sourceCurrency) {
+            const row = element.closest('.product-row');
             if (!row) return;
-            const nombre = row.querySelector('.prod-name').value;
-            const priceType = row.querySelector('.prod-price-type').value;
-            const priceInput = row.querySelector('.prod-price');
-
-            if (priceType === "PRECIO") {
-                priceInput.readOnly = true;
-                priceInput.classList.add('bg-light');
+            const tc = parseFloat(document.getElementById('tc_valor').value) || 1;
+            
+            const inputUsd = row.querySelector('.prod-price-usd');
+            const inputArs = row.querySelector('.prod-price-ars');
+            
+            let val = parseFloat(element.value) || 0;
+            
+            if (sourceCurrency === 'USD') {
+                inputArs.value = (val * tc).toFixed(2);
             } else {
-                priceInput.readOnly = false;
-                priceInput.classList.remove('bg-light');
+                inputUsd.value = (val / tc).toFixed(2);
             }
-
-            const prodItem = CATALOGO.find(p => p.nombre === nombre);
-            if (prodItem) {
-                if (priceType === "PRECIO") {
-                    priceInput.value = prodItem.precio || 0;
-                } else {
-                    priceInput.value = prodItem.ultimoPrecio || prodItem.precio || 0;
-                }
-            }
-            calcularTotales();
         }
 
         function agregarDescuento() {
@@ -682,9 +704,16 @@
         function calcularTotales() {
             // 1. Calcular Subtotal Productos (Original)
             let subtotalOriginal = 0;
+            const monedaGeneral = document.querySelector('input[name="moneda"]:checked').value;
+
             document.querySelectorAll('.product-row').forEach(row => {
                 const qty = parseFloat(row.querySelector('.prod-qty').value) || 0;
-                const price = parseFloat(row.querySelector('.prod-price').value) || 0;
+                let price = 0;
+                if (monedaGeneral === 'USD') {
+                    price = parseFloat(row.querySelector('.prod-price-usd').value) || 0;
+                } else {
+                    price = parseFloat(row.querySelector('.prod-price-ars').value) || 0;
+                }
                 const sub = qty * price;
                 row.querySelector('.prod-sub').value = sub.toFixed(2);
                 subtotalOriginal += sub;
@@ -749,12 +778,17 @@
             document.querySelectorAll('.product-row').forEach(row => {
                 const nombre = row.querySelector('.prod-name').value;
                 const cantidad = parseFloat(row.querySelector('.prod-qty').value) || 0;
-                const precio = parseFloat(row.querySelector('.prod-price').value) || 0;
                 const tipoPrecio = row.querySelector('.prod-price-type').value;
                 if (nombre && cantidad > 0) {
                     const catItem = CATALOGO.find(c => c.nombre === nombre);
                     let catStr = catItem ? catItem.categoria : "";
                     let modStr = catItem ? nombre.replace(catStr + " - ", "").trim() : nombre;
+                    
+                    const monedaGeneral = document.querySelector('input[name="moneda"]:checked').value;
+                    const precioUsd = parseFloat(row.querySelector('.prod-price-usd').value) || 0;
+                    const precioArs = parseFloat(row.querySelector('.prod-price-ars').value) || 0;
+                    const precio = monedaGeneral === 'USD' ? precioUsd : precioArs;
+
                     productos.push({
                         id: catItem ? catItem.id : '',
                         categoria: catStr,
@@ -762,6 +796,7 @@
                         nombre: nombre,
                         cantidad: cantidad,
                         precio_unitario: precio,
+                        precio_usd: precioUsd,
                         tipo_precio: tipoPrecio
                     });
                 }

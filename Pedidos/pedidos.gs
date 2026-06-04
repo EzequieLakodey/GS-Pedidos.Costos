@@ -512,22 +512,133 @@ function moverAEntregados(hojaOrigen, fila) {
   const destino = ss.getSheetByName(CONFIG.HOJA_ENTREGADOS);
   if (!destino) return;
 
-  // Transferir dinámicamente agregando la Fecha de Entrega automática
-  transferirFilaDinamica(hojaOrigen, fila, destino, {
-    "FECHA ENTREGA": new Date(),
-    "ESTADO": "ENTREGADO"
-  });
+  // Guardamos el contexto para el modal
+  const hojaOrigenName = hojaOrigen.getName();
+  PropertiesService.getScriptProperties().setProperty('ENTREGA_HOJA', hojaOrigenName);
+  PropertiesService.getScriptProperties().setProperty('ENTREGA_FILA', fila.toString());
 
-  registrarMovimientoLog({
-    accion: "CAMBIO_ESTADO",
-    hojaOrigen: hojaOrigen.getName(),
-    hojaDestino: destino.getName(),
-    fila,
-    estado: "ENTREGADO",
-    detalle: "Movimiento automático a ENTREGADOS"
-  });
+  // Abrir el modal asincrónico
+  const html = HtmlService.createTemplateFromFile('FormularioPagoFinal');
+  SpreadsheetApp.getUi().showModalDialog(html.evaluate().setWidth(750).setHeight(650), "💰 Pago Final y Entrega");
+}
 
-  hojaOrigen.deleteRow(fila);
+function obtenerDataPedidoPagoFinal() {
+  const props = PropertiesService.getScriptProperties();
+  const hojaName = props.getProperty('ENTREGA_HOJA');
+  const filaStr = props.getProperty('ENTREGA_FILA');
+  if (!hojaName || !filaStr) throw new Error("Faltan datos de referencia del pedido.");
+  const fila = parseInt(filaStr, 10);
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName(hojaName);
+  const headers = hoja.getRange(CONFIG.FILA_HEADERS, 1, 1, hoja.getLastColumn()).getValues()[0].map(h => h.toString().trim().toUpperCase());
+  const data = hoja.getRange(fila, 1, 1, hoja.getLastColumn()).getValues()[0];
+
+  const cols = {
+    PEDIDO: headers.indexOf("PEDIDO") !== -1 ? headers.indexOf("PEDIDO") : -1,
+    SUBTOTAL: headers.indexOf("SUBTOTAL") !== -1 ? headers.indexOf("SUBTOTAL") : -1,
+    TOTAL: headers.indexOf("TOTAL") !== -1 ? headers.indexOf("TOTAL") : -1,
+    CUENTA: headers.indexOf("CUENTA") !== -1 ? headers.indexOf("CUENTA") : -1,
+  };
+
+  const pedidoTexto = cols.PEDIDO !== -1 ? data[cols.PEDIDO].toString() : "";
+  const productosRaw = pedidoTexto.split('\n').map(l => l.trim()).filter(l => l);
+  const productos = [];
+  
+  for (const line of productosRaw) {
+    const parts = line.split('|').map(p => p.trim());
+    if (parts.length >= 4) {
+      // Formato: Cantidad | Categoria | Modelo | $Precio AR$/U$D
+      const qty = parseFloat(parts[0]) || 0;
+      const cat = parts[1];
+      const mod = parts[2];
+      const precioStr = parts[3].replace(/[^0-9.,]/g, '').replace(',', '.');
+      const precio = parseFloat(precioStr) || 0;
+      productos.push({
+        cantidad: qty,
+        nombre: `${cat} - ${mod}`,
+        precio: precio,
+        subtotal: qty * precio
+      });
+    }
+  }
+
+  return {
+    subtotal: cols.SUBTOTAL !== -1 ? (parseFloat(data[cols.SUBTOTAL]) || 0) : 0,
+    total: cols.TOTAL !== -1 ? (parseFloat(data[cols.TOTAL]) || 0) : 0,
+    cuenta: cols.CUENTA !== -1 ? (parseFloat(data[cols.CUENTA]) || 0) : 0,
+    productos: productos
+  };
+}
+
+function confirmarEntregaYPago(montoPago) {
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(5000)) throw new Error("Sistema ocupado, intenta de nuevo.");
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const hojaName = props.getProperty('ENTREGA_HOJA');
+    const filaStr = props.getProperty('ENTREGA_FILA');
+    if (!hojaName || !filaStr) throw new Error("No hay contexto para confirmar entrega.");
+    const fila = parseInt(filaStr, 10);
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const hojaOrigen = ss.getSheetByName(hojaName);
+    const destino = ss.getSheetByName(CONFIG.HOJA_ENTREGADOS);
+    if (!hojaOrigen || !destino) throw new Error("No se encontraron las hojas origen o destino.");
+
+    const headersOrigen = hojaOrigen.getRange(CONFIG.FILA_HEADERS, 1, 1, hojaOrigen.getLastColumn()).getValues()[0].map(h => h.toString().trim().toUpperCase());
+    const idxSubtotal = headersOrigen.indexOf("SUBTOTAL");
+    const idxTotal = headersOrigen.indexOf("TOTAL");
+    const idxCuenta = headersOrigen.indexOf("CUENTA");
+
+    const valoresOriginales = hojaOrigen.getRange(fila, 1, 1, hojaOrigen.getLastColumn()).getValues()[0];
+    let subtotalActual = idxSubtotal !== -1 ? (parseFloat(valoresOriginales[idxSubtotal]) || 0) : 0;
+    let totalActual = idxTotal !== -1 ? (parseFloat(valoresOriginales[idxTotal]) || 0) : 0;
+    let cuentaActual = idxCuenta !== -1 ? (parseFloat(valoresOriginales[idxCuenta]) || 0) : 0;
+
+    let nuevoSubtotal = Math.max(0, subtotalActual - montoPago);
+    let nuevoTotal = Math.max(0, totalActual - montoPago);
+    let nuevaCuenta = cuentaActual + montoPago;
+
+    transferirFilaDinamica(hojaOrigen, fila, destino, {
+      "FECHA ENTREGA": new Date(),
+      "ESTADO": "ENTREGADO",
+      "SUBTOTAL": nuevoSubtotal,
+      "TOTAL": nuevoTotal,
+      "CUENTA": nuevaCuenta
+    });
+
+    registrarMovimientoLog({
+      accion: "CAMBIO_ESTADO",
+      hojaOrigen: hojaOrigen.getName(),
+      hojaDestino: destino.getName(),
+      fila,
+      estado: "ENTREGADO",
+      detalle: "Movimiento a ENTREGADOS. Pago recibido: " + montoPago
+    });
+
+    hojaOrigen.deleteRow(fila);
+    props.deleteProperty('ENTREGA_HOJA');
+    props.deleteProperty('ENTREGA_FILA');
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function cancelarEntregaYPago() {
+  const props = PropertiesService.getScriptProperties();
+  const hojaName = props.getProperty('ENTREGA_HOJA');
+  const filaStr = props.getProperty('ENTREGA_FILA');
+  if (!hojaName || !filaStr) return;
+  const fila = parseInt(filaStr, 10);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName(hojaName);
+  if (!hoja) return;
+  const headers = hoja.getRange(CONFIG.FILA_HEADERS, 1, 1, hoja.getLastColumn()).getValues()[0].map(h => h.toString().trim().toUpperCase());
+  const colEstado = headers.indexOf("ESTADO") + 1;
+  if (colEstado > 0) hoja.getRange(fila, colEstado).setValue("Terminado");
+  props.deleteProperty('ENTREGA_HOJA');
+  props.deleteProperty('ENTREGA_FILA');
 }
 
 // --- ENTREGA PARCIAL ---
@@ -884,8 +995,9 @@ function actualizarPreciosProductos(productosPedido) {
       const filaIdx = data.findIndex(r => r[colId - 1] === prod.id);
       if (filaIdx !== -1) {
         const ultimoPrecioActual = parseFloat(data[filaIdx][colUltimoPrecio - 1]) || 0;
-        if (prod.precio_unitario !== ultimoPrecioActual) {
-          hojaProds.getRange(filaIdx + 1, colUltimoPrecio).setValue(prod.precio_unitario);
+        const precioAGuardar = prod.precio_usd !== undefined ? prod.precio_usd : prod.precio_unitario;
+        if (precioAGuardar !== ultimoPrecioActual) {
+          hojaProds.getRange(filaIdx + 1, colUltimoPrecio).setValue(precioAGuardar);
         }
       }
     }

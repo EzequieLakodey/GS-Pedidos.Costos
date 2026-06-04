@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+
+        .card {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .table {
+            font-size: 0.9rem;
+        }
+
+        .summary-box {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading" class="text-center mt-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2 text-muted">Cargando detalles del pedido...</p>
+    </div>
+
+    <div id="content" class="d-none">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title text-primary">📦 Productos a Entregar</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Cant.</th>
+                                <th>Producto</th>
+                                <th class="text-end">Precio U.</th>
+                                <th class="text-end">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla_productos"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="summary-box h-100">
+                    <h6 class="text-muted mb-3">Resumen Financiero</h6>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Subtotal Pendiente:</span>
+                        <strong id="lbl_subtotal"></strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Pagos a Cuenta (Previos):</span>
+                        <strong id="lbl_cuenta" class="text-success"></strong>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between fs-5">
+                        <span>Saldo a Pagar:</span>
+                        <strong id="lbl_total" class="text-danger"></strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card border-primary h-100">
+                    <div class="card-body">
+                        <h6 class="card-title text-primary">💰 Ingreso de Pago</h6>
+                        <label class="form-label small">Monto abonado por el cliente al entregar:</label>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">$</span>
+                            <input type="number" id="monto_pago" class="form-control form-control-lg text-end" value="0"
+                                min="0" step="0.01">
+                        </div>
+
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="check_saldar" onchange="toggleSaldar()">
+                            <label class="form-check-label text-muted fw-semibold" for="check_saldar">Pagado en su
+                                totalidad (Saldar cuenta)</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end mt-4">
+            <button class="btn btn-secondary" onclick="cancelar()">Cancelar</button>
+            <button id="btnConfirmar" class="btn btn-success px-4" onclick="confirmar()">Confirmar Entrega y
+                Pago</button>
+        </div>
+    </div>
+
+    <script>
+        let saldoPendiente = 0;
+
+        window.onload = function () {
+            google.script.run
+                .withSuccessHandler(cargarDatos)
+                .withFailureHandler(err => {
+                    alert("Error al cargar datos: " + err.message);
+                    google.script.host.close();
+                })
+                .obtenerDataPedidoPagoFinal();
+        };
+
+        function cargarDatos(data) {
+            document.getElementById('loading').classList.add('d-none');
+            document.getElementById('content').classList.remove('d-none');
+
+            saldoPendiente = data.total;
+
+            const format = (num) => '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            document.getElementById('lbl_subtotal').innerText = format(data.subtotal);
+            document.getElementById('lbl_cuenta').innerText = format(data.cuenta);
+            document.getElementById('lbl_total').innerText = format(data.total);
+
+            const tbody = document.getElementById('tabla_productos');
+            tbody.innerHTML = '';
+
+            if (data.productos && data.productos.length > 0) {
+                data.productos.forEach(p => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${p.cantidad}</td>
+                            <td>${p.nombre}</td>
+                            <td class="text-end text-muted">${format(p.precio)}</td>
+                            <td class="text-end fw-semibold">${format(p.subtotal)}</td>
+                        </tr>
+                    `;
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No se pudo desglosar el detalle de productos.</td></tr>';
+            }
+        }
+
+        function toggleSaldar() {
+            const isChecked = document.getElementById('check_saldar').checked;
+            const input = document.getElementById('monto_pago');
+            if (isChecked) {
+                input.value = saldoPendiente.toFixed(2);
+                input.readOnly = true;
+                input.classList.add('bg-light');
+            } else {
+                input.readOnly = false;
+                input.classList.remove('bg-light');
+            }
+        }
+
+        function cancelar() {
+            document.getElementById('btnConfirmar').disabled = true;
+            google.script.run
+                .withSuccessHandler(() => google.script.host.close())
+                .withFailureHandler(() => google.script.host.close())
+                .cancelarEntregaYPago();
+        }
+
+        function confirmar() {
+            const btn = document.getElementById('btnConfirmar');
+            btn.disabled = true;
+            btn.innerText = "PROCESANDO... ⏳";
+
+            const monto = parseFloat(document.getElementById('monto_pago').value) || 0;
+
+            google.script.run
+                .withSuccessHandler(() => {
+                    google.script.host.close();
+                })
+                .withFailureHandler(err => {
+                    alert("Error: " + err.message);
+                    btn.disabled = false;
+                    btn.innerText = "Confirmar Entrega y Pago";
+                })
+                .confirmarEntregaYPago(monto);
+        }
+    </script>
+</body>
+
+</html>
