@@ -469,17 +469,29 @@
           <input type="search" class="form-control prod-name" list="list_${id}" placeholder="Seleccionar producto..." oninput="actualizarPrecioYCalcular('${id}')" onchange="actualizarPrecioYCalcular('${id}')" onfocus="this.select()">
           <datalist id="list_${id}"></datalist>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label small text-muted mb-1">Cant.</label>
           <input type="number" class="form-control prod-qty" value="1" min="1" step="1" oninput="this.value = Math.round(this.value); calcularTotales(); evaluarStocks();">
         </div>
-        <div class="col-md-4">
-          <label class="form-label small text-muted mb-1">Precio U.</label>
-          <input type="number" class="form-control prod-price" placeholder="0.00" step="0.01" oninput="calcularTotales()">
+        <div class="col-md-3">
+          <label class="form-label small text-muted mb-1">Tipo Precio</label>
+          <select class="form-select prod-price-type" onchange="cambiarTipoPrecio('${id}')">
+            <option value="PRECIO">Lista (PRECIO)</option>
+            <option value="ULTIMO_PRECIO">Personalizado (ULTIMO PRECIO)</option>
+          </select>
         </div>
-        <div class="col-md-5 d-flex gap-2">
-          <input type="text" class="form-control bg-white text-end prod-sub" readonly value="0.00">
-          <button type="button" class="btn btn-outline-danger" onclick="document.getElementById('prod_${id}').remove(); calcularTotales(); evaluarStocks();">X</button>
+        <div class="col-md-3">
+          <label class="form-label small text-muted mb-1">Precio U.</label>
+          <input type="number" class="form-control prod-price bg-light" placeholder="0.00" step="0.01" oninput="calcularTotales()" readonly>
+        </div>
+        <div class="col-md-4 d-flex gap-2">
+          <div class="w-100">
+            <label class="form-label small text-muted mb-1">Subtotal</label>
+            <input type="text" class="form-control bg-white text-end prod-sub" readonly value="0.00">
+          </div>
+          <div class="align-self-end">
+            <button type="button" class="btn btn-outline-danger" style="height: 42px;" onclick="document.getElementById('prod_${id}').remove(); calcularTotales(); evaluarStocks();">X</button>
+          </div>
         </div>
         <div class="col-12 mt-2" id="stock_status_${id}"></div>
       </div>
@@ -512,12 +524,48 @@
             if (nombre !== currentSelected) {
                 const prodItem = CATALOGO.find(p => p.nombre === nombre);
                 if (prodItem) {
-                    row.querySelector('.prod-price').value = prodItem.precio || 0;
+                    const priceType = row.querySelector('.prod-price-type').value;
+                    const priceInput = row.querySelector('.prod-price');
+                    if (priceType === "PRECIO") {
+                        priceInput.value = prodItem.precio || 0;
+                        priceInput.readOnly = true;
+                        priceInput.classList.add('bg-light');
+                    } else {
+                        priceInput.value = prodItem.ultimoPrecio || prodItem.precio || 0;
+                        priceInput.readOnly = false;
+                        priceInput.classList.remove('bg-light');
+                    }
                     row.dataset.selectedProd = nombre;
                 }
             }
             calcularTotales();
             evaluarStocks();
+        }
+
+        function cambiarTipoPrecio(rowId) {
+            const row = document.getElementById('prod_' + rowId);
+            if (!row) return;
+            const nombre = row.querySelector('.prod-name').value;
+            const priceType = row.querySelector('.prod-price-type').value;
+            const priceInput = row.querySelector('.prod-price');
+
+            if (priceType === "PRECIO") {
+                priceInput.readOnly = true;
+                priceInput.classList.add('bg-light');
+            } else {
+                priceInput.readOnly = false;
+                priceInput.classList.remove('bg-light');
+            }
+
+            const prodItem = CATALOGO.find(p => p.nombre === nombre);
+            if (prodItem) {
+                if (priceType === "PRECIO") {
+                    priceInput.value = prodItem.precio || 0;
+                } else {
+                    priceInput.value = prodItem.ultimoPrecio || prodItem.precio || 0;
+                }
+            }
+            calcularTotales();
         }
 
         function agregarDescuento() {
@@ -702,6 +750,7 @@
                 const nombre = row.querySelector('.prod-name').value;
                 const cantidad = parseFloat(row.querySelector('.prod-qty').value) || 0;
                 const precio = parseFloat(row.querySelector('.prod-price').value) || 0;
+                const tipoPrecio = row.querySelector('.prod-price-type').value;
                 if (nombre && cantidad > 0) {
                     const catItem = CATALOGO.find(c => c.nombre === nombre);
                     let catStr = catItem ? catItem.categoria : "";
@@ -712,7 +761,8 @@
                         modelo: modStr,
                         nombre: nombre,
                         cantidad: cantidad,
-                        precio_unitario: precio
+                        precio_unitario: precio,
+                        tipo_precio: tipoPrecio
                     });
                 }
             });

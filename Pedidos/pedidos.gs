@@ -101,7 +101,7 @@ function onEditSimple(e) {
     if (colEstado > 0 && col === colEstado) {
       const valNorm = val.toString().trim().toUpperCase();
       if (name === CONFIG.HOJA_PEDIDOS) {
-        if (valNorm === "PRODUCIR" || valNorm === "TERMINADO") {
+        if (valNorm === "PRODUCIR" || valNorm === "Terminado") {
           iniciarDecisionStockPorEstado(sheet, row, colEstado, valNorm, e.oldValue);
           return;
         }
@@ -203,18 +203,21 @@ function obtenerDataInicialPedidos() {
     if (colPrecio === -1 && headers.length >= 14) {
       colPrecio = 13; // Columna N es el índice 13
     }
+    let colUltimoPrecio = headers.findIndex(h => h && h.toString().trim().toUpperCase() === "ULTIMO PRECIO");
 
     for (let i = filaInicioProds - 1; i < data.length; i++) {
       if (colId !== -1 && data[i][colId] && data[i][colId].toString().trim() !== "") {
         let recetaTexto = colMat !== -1 && data[i][colMat] ? data[i][colMat].toString() : "";
         let precioVal = colPrecio !== -1 && data[i][colPrecio] !== undefined ? parseFloat(data[i][colPrecio]) || 0 : 0;
+        let ultimoPrecioVal = colUltimoPrecio !== -1 && data[i][colUltimoPrecio] !== undefined ? parseFloat(data[i][colUltimoPrecio]) || 0 : 0;
         productos.push({
           id: data[i][colId],
           categoria: colCat !== -1 && data[i][colCat] ? data[i][colCat].toString().trim() : "Sin Categoría",
           nombre: ((colCat !== -1 && data[i][colCat] ? data[i][colCat] : "") + " - " + (colMod !== -1 && data[i][colMod] ? data[i][colMod] : "")).trim(),
           stock: colStock !== -1 ? parseFloat(data[i][colStock]) || 0 : 0,
           receta: parsearReceta(recetaTexto),
-          precio: precioVal
+          precio: precioVal,
+          ultimoPrecio: ultimoPrecioVal
         });
       }
     }
@@ -333,7 +336,7 @@ function guardarNuevoPedido(datos) {
           hojaOrigen: CONFIG.HOJA_PEDIDOS,
           hojaDestino: CONFIG.HOJA_TERMINADOS,
           fila: filaNum,
-          estado: "TERMINADO",
+          estado: "Terminado",
           detalle: `Pedido creado y movido a ${CONFIG.HOJA_TERMINADOS}`
         });
         sheet.deleteRow(filaNum);
@@ -468,7 +471,7 @@ function procesarFlujoPedidos(hoja, fila, columna, valor) {
   const valNorm = valor.toString().trim().toUpperCase();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  if (valNorm === "TERMINADO") {
+  if (valNorm === "Terminado") {
     const destino = ss.getSheetByName(CONFIG.HOJA_TERMINADOS);
     if (!destino) return;
     transferirFilaDinamica(hoja, fila, destino);
@@ -477,7 +480,7 @@ function procesarFlujoPedidos(hoja, fila, columna, valor) {
       hojaOrigen: hoja.getName(),
       hojaDestino: destino.getName(),
       fila,
-      estado: "TERMINADO",
+      estado: "Terminado",
       detalle: "Movimiento automático por estado TERMINADO"
     });
     hoja.deleteRow(fila);
@@ -867,23 +870,22 @@ function actualizarPreciosProductos(productosPedido) {
       .map(h => h.toString().trim().toUpperCase());
 
     const colId = headers.indexOf("ID") + 1;
-    let colPrecio = headers.indexOf("PRECIO") + 1;
-    if (colPrecio === 0 && hojaProds.getLastColumn() >= 14) {
-      colPrecio = 14; // Fallback a columna N
-    }
+    const colUltimoPrecio = headers.indexOf("ULTIMO PRECIO") + 1;
 
-    if (colId === 0 || colPrecio === 0) return;
+    if (colId === 0 || colUltimoPrecio === 0) return;
 
     const data = hojaProds.getDataRange().getValues();
 
     for (const prod of productosPedido) {
       if (!prod.id) continue;
+      // Solo sobreescribimos en "ULTIMO PRECIO" si seleccionó "ULTIMO_PRECIO"
+      if (prod.tipo_precio !== "ULTIMO_PRECIO") continue;
 
       const filaIdx = data.findIndex(r => r[colId - 1] === prod.id);
       if (filaIdx !== -1) {
-        const precioActual = parseFloat(data[filaIdx][colPrecio - 1]) || 0;
-        if (prod.precio_unitario !== precioActual) {
-          hojaProds.getRange(filaIdx + 1, colPrecio).setValue(prod.precio_unitario);
+        const ultimoPrecioActual = parseFloat(data[filaIdx][colUltimoPrecio - 1]) || 0;
+        if (prod.precio_unitario !== ultimoPrecioActual) {
+          hojaProds.getRange(filaIdx + 1, colUltimoPrecio).setValue(prod.precio_unitario);
         }
       }
     }
@@ -1153,7 +1155,7 @@ function construirDataDecisionStock(productosPedido) {
     const receta = parsearReceta(recetaTexto);
 
     let materiales = [];
-    let materialesSuficientes = receta.length > 0;
+    let materialesSuficientes = true; // Si no tiene receta (longitud 0), se considera suficiente (bypass)
     receta.forEach(mat => {
       const filaMatIdx = datosM.findIndex(r => r[colsM.DETALLES - 1] === mat.nombre);
       const stockMat = filaMatIdx !== -1 ? (parseFloat(datosM[filaMatIdx][colsM.STOCK - 1]) || 0) : 0;
@@ -1219,7 +1221,8 @@ function descontarStockSegunDecision(productosPedido, decisionesMap) {
       const recetaTexto = datosP[filaProdIdx][colsP.MATERIALES - 1] || "";
       const materialesReceta = parsearReceta(recetaTexto);
       if (!materialesReceta.length) {
-        throw new Error(`El producto ${prod.categoria} - ${prod.modelo} no tiene receta de materiales.`);
+        // BYPASS: Si no tiene receta de materiales, no restamos nada y continuamos
+        continue;
       }
 
       for (const mat of materialesReceta) {
