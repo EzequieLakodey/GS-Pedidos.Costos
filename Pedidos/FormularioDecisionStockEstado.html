@@ -4,8 +4,9 @@
   <meta charset="UTF-8">
   <base target="_top">
   <style>
-    body { font-family: Arial, sans-serif; padding: 14px; background: #f8fafc; color: #1f2937; }
-    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+    body { font-family: 'Inter', Arial, sans-serif; padding: 14px; background: #f8fafc; color: #1f2937; }
+    h3 { margin: 0 0 8px; font-size: 1.05rem; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06); }
     .title { font-weight: 700; margin-bottom: 4px; }
     .meta { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
     .ok { color: #047857; font-size: 12px; }
@@ -59,7 +60,7 @@
               Producto ${it.productoDisponible ? 'disponible' : 'insuficiente'}
             </div>
             <div class="${it.materialesSuficientes ? 'ok' : 'bad'}">
-              Materiales ${it.materialesSuficientes ? 'suficientes' : 'insuficientes'}
+              Materiales ${it.materialesSuficientes ? 'suficientes' : 'insuficientes (puedes continuar y quedará stock negativo)'}
             </div>
             <div class="mats">${mats || 'Sin receta de materiales'}</div>
             <div style="margin-top:8px;">

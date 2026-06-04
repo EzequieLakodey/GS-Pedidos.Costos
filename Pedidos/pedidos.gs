@@ -6,6 +6,7 @@ const CONFIG = {
   HOJA_PEDIDOS: "Pedidos",
   HOJA_TERMINADOS: "Terminados",
   HOJA_ENTREGADOS: "Entregados",
+  HOJA_LOG: "LogMovimientos",
   HOJA_CLIENTES: "Clientes",
   FILA_HEADERS: 3,
   FILA_INICIO_DATOS: 4
@@ -133,9 +134,18 @@ function instalarTodoElSistema() {
 
 function onEditInstalable(e) {
   if (!e || !e.range) return;
-  onEditSimple(e);
-  // 2. Manejar conversión de moneda
-  manejarConversionMoneda(e);
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(5000)) {
+    console.warn("onEditInstalable omitido por lock ocupado.");
+    return;
+  }
+  try {
+    onEditSimple(e);
+    // 2. Manejar conversión de moneda
+    manejarConversionMoneda(e);
+  } finally {
+    lock.releaseLock();
+  }
 }
 // --- LÓGICA DE PEDIDOS (FORMULARIO Y GUARDADO) ---
 function abrirModalPedidos() {
@@ -274,21 +284,7 @@ function guardarNuevoPedido(datos) {
     let impPctNum = parseFloat(datos.impuesto_pct) || 0;
 
     // Obtener la fila del cliente en la hoja "Clientes" para el hipervínculo
-    let clienteLink = datos.cliente;
-    try {
-      const hojaClientes = ss.getSheetByName(CONFIG.HOJA_CLIENTES);
-      if (hojaClientes) {
-        const gidClientes = hojaClientes.getSheetId();
-        const clientesData = hojaClientes.getRange("A2:A" + hojaClientes.getLastRow()).getValues().flat();
-        const filaIdx = clientesData.findIndex(c => c && c.toString().trim().toUpperCase() === datos.cliente.trim().toUpperCase());
-        if (filaIdx !== -1) {
-          const filaCliente = filaIdx + 2; // +2 porque el rango empieza en A2 (índice 0)
-          clienteLink = `=HYPERLINK("#gid=${gidClientes}&range=A${filaCliente}"; "${datos.cliente.toUpperCase()}")`;
-        }
-      }
-    } catch (eLink) {
-      console.error("Error al crear link de cliente: " + eLink.message);
-    }
+    const clienteLink = construirLinkCliente(datos.cliente) || datos.cliente;
 
     // Mapeamos los datos correspondientes a cada encabezado
     const setValByHeader = (headerName, value, numberFormat = null) => {
@@ -332,6 +328,14 @@ function guardarNuevoPedido(datos) {
       const hojaTerminados = ss.getSheetByName(CONFIG.HOJA_TERMINADOS);
       if (hojaTerminados) {
         transferirFilaDinamica(sheet, filaNum, hojaTerminados);
+        registrarMovimientoLog({
+          accion: "ALTA_DIRECTA_TERMINADO",
+          hojaOrigen: CONFIG.HOJA_PEDIDOS,
+          hojaDestino: CONFIG.HOJA_TERMINADOS,
+          fila: filaNum,
+          estado: "TERMINADO",
+          detalle: `Pedido creado y movido a ${CONFIG.HOJA_TERMINADOS}`
+        });
         sheet.deleteRow(filaNum);
       }
     }
@@ -433,6 +437,20 @@ function transferirFilaDinamica(hojaOrigen, filaOrigen, hojaDestino, valoresExtr
     return "";
   });
 
+  // Forzar que CLIENTE se mantenga como hyperlink hacia hoja Clientes.
+  const idxClienteDestino = headersDestino.indexOf("CLIENTE");
+  if (idxClienteDestino !== -1) {
+    let clienteNombre = null;
+    const idxClienteOrigen = headersOrigen.indexOf("CLIENTE");
+    if (idxClienteOrigen !== -1) {
+      const formulaCliente = formulasOrigen[idxClienteOrigen];
+      const valorCliente = valoresOrigen[idxClienteOrigen];
+      clienteNombre = extraerNombreCliente(valorCliente, formulaCliente);
+    }
+    const linkCliente = construirLinkCliente(clienteNombre);
+    if (linkCliente) nuevaFila[idxClienteDestino] = linkCliente;
+  }
+
   hojaDestino.appendRow(nuevaFila);
 
   // Aplicar formatos básicos si es necesario (ej: Fechas)
@@ -454,6 +472,14 @@ function procesarFlujoPedidos(hoja, fila, columna, valor) {
     const destino = ss.getSheetByName(CONFIG.HOJA_TERMINADOS);
     if (!destino) return;
     transferirFilaDinamica(hoja, fila, destino);
+    registrarMovimientoLog({
+      accion: "CAMBIO_ESTADO",
+      hojaOrigen: hoja.getName(),
+      hojaDestino: destino.getName(),
+      fila,
+      estado: "TERMINADO",
+      detalle: "Movimiento automático por estado TERMINADO"
+    });
     hoja.deleteRow(fila);
   }
   else if (valNorm === "ENTREGADO") {
@@ -487,6 +513,15 @@ function moverAEntregados(hojaOrigen, fila) {
   transferirFilaDinamica(hojaOrigen, fila, destino, {
     "FECHA ENTREGA": new Date(),
     "ESTADO": "ENTREGADO"
+  });
+
+  registrarMovimientoLog({
+    accion: "CAMBIO_ESTADO",
+    hojaOrigen: hojaOrigen.getName(),
+    hojaDestino: destino.getName(),
+    fila,
+    estado: "ENTREGADO",
+    detalle: "Movimiento automático a ENTREGADOS"
   });
 
   hojaOrigen.deleteRow(fila);
@@ -584,17 +619,24 @@ function guardarEntregaParcial(datos) {
     let subEnt = subtotalPendienteActual * ratioEntregado;
     let totalEnt = totalPendienteActual * ratioEntregado;
     let cuentaEntregada = pagadoTotalAcumulado * ratioEntregado;
+    let subEntPendiente = Math.max(0, subEnt - cuentaEntregada);
+    let totalEntPendiente = Math.max(0, totalEnt - cuentaEntregada);
 
     // 1. ENVIAR LO ENTREGADO A LA HOJA "ENTREGADOS"
     const headersDest = hEntregados.getRange(CONFIG.FILA_HEADERS, 1, 1, hEntregados.getLastColumn()).getValues()[0].map(h => h.toString().trim().toUpperCase());
     let filaParaEntregados = headersDest.map(header => {
       if (header === "PEDIDO") return entregados.map(p => `${p.cantidad_entregada} | ${p.categoria} | ${p.modelo} | $${p.precio_unitario}`).join('\n');
-      if (header === "SUBTOTAL") return subEnt;
-      if (header === "TOTAL") return totalEnt;
+      if (header === "SUBTOTAL") return subEntPendiente;
+      if (header === "TOTAL") return totalEntPendiente;
       if (header === "T.C") return datos.tc;
       if (header === "ESTADO") return "ENTREGADO";
       if (header === "CUENTA") return cuentaEntregada;
       if (header === "FECHA ENTREGA") return new Date();
+      if (header === "CLIENTE") {
+        const idxCli = headersOrigen.indexOf("CLIENTE");
+        const clienteNombre = idxCli !== -1 ? extraerNombreCliente(originalValues[idxCli], "") : "";
+        return construirLinkCliente(clienteNombre) || (idxCli !== -1 ? originalValues[idxCli] : "");
+      }
 
       const idx = headersOrigen.indexOf(header);
       return idx !== -1 ? originalValues[idx] : "";
@@ -603,6 +645,14 @@ function guardarEntregaParcial(datos) {
     hEntregados.appendRow(filaParaEntregados);
     const lastRowEnt = hEntregados.getLastRow();
     headersDest.forEach((h, i) => { if (h.includes("FECHA")) hEntregados.getRange(lastRowEnt, i + 1).setNumberFormat('dd/mm/yyyy'); });
+    registrarMovimientoLog({
+      accion: "ENTREGA_PARCIAL",
+      hojaOrigen: hojaOrigenNombre,
+      hojaDestino: CONFIG.HOJA_ENTREGADOS,
+      fila,
+      estado: "ENTREGA PARCIAL",
+      detalle: `Se transfirió parte del pedido. Pago recibido: ${pagoRecibido}`
+    });
 
     // 2. ACTUALIZAR LO QUE QUEDA EN LA HOJA "PEDIDOS"
     let restantes = datos.productos_entregados.filter(p => (p.cantidad_original - p.cantidad_entregada) > 0);
@@ -1020,6 +1070,13 @@ function aplicarDecisionStockEstado(decisiones) {
     }
 
     procesarFlujoPedidos(hoja, ctx.fila, ctx.colEstado, ctx.estadoObjetivo);
+    registrarMovimientoLog({
+      accion: "DECISION_STOCK",
+      hojaOrigen: ctx.hoja,
+      fila: ctx.fila,
+      estado: ctx.estadoObjetivo,
+      detalle: `Fuentes elegidas: ${JSON.stringify(decisionesMap)}`
+    });
     props.deleteProperty("DECISION_STOCK_CTX");
 
     return { success: true };
@@ -1169,15 +1226,6 @@ function descontarStockSegunDecision(productosPedido, decisionesMap) {
         const requerida = mat.cantidad * prod.cantidad;
         const filaMatIdx = datosM.findIndex(r => r[colsM.DETALLES - 1] === mat.nombre);
         if (filaMatIdx === -1) throw new Error(`No se encontró el material ${mat.nombre}.`);
-        const stockMatActual = parseFloat(datosM[filaMatIdx][colsM.STOCK - 1]) || 0;
-        if (stockMatActual < requerida) {
-          throw new Error(`Stock insuficiente de material (${mat.nombre}) para ${prod.categoria} - ${prod.modelo}.`);
-        }
-      }
-
-      for (const mat of materialesReceta) {
-        const requerida = mat.cantidad * prod.cantidad;
-        const filaMatIdx = datosM.findIndex(r => r[colsM.DETALLES - 1] === mat.nombre);
         const filaMatSheet = filaMatIdx + 1;
         const stockMatActual = parseFloat(datosM[filaMatIdx][colsM.STOCK - 1]) || 0;
         const nuevoStockMat = stockMatActual - requerida;
@@ -1323,4 +1371,73 @@ function leerAlertasStockConfig() {
   } catch (e) {
     return { version: 1, updatedAt: null, items: [] };
   }
+}
+
+function construirLinkCliente(nombreCliente) {
+  const nombre = (nombreCliente || "").toString().trim();
+  if (!nombre) return null;
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const hojaClientes = ss.getSheetByName(CONFIG.HOJA_CLIENTES);
+    if (!hojaClientes || hojaClientes.getLastRow() < 2) return nombre;
+    const gidClientes = hojaClientes.getSheetId();
+    const clientesData = hojaClientes.getRange("A2:A" + hojaClientes.getLastRow()).getValues().flat();
+    const filaIdx = clientesData.findIndex(c => c && c.toString().trim().toUpperCase() === nombre.toUpperCase());
+    if (filaIdx === -1) return nombre;
+    const filaCliente = filaIdx + 2;
+    return `=HYPERLINK("#gid=${gidClientes}&range=A${filaCliente}"; "${nombre.toUpperCase()}")`;
+  } catch (e) {
+    return nombre;
+  }
+}
+
+function extraerNombreCliente(valorCliente, formulaCliente) {
+  if (valorCliente && valorCliente.toString().trim() !== "") {
+    return valorCliente.toString().trim();
+  }
+  const formula = (formulaCliente || "").toString();
+  if (!formula) return "";
+  const m = formula.match(/;\s*"([^"]+)"\s*\)$/);
+  if (m && m[1]) return m[1].trim();
+  return "";
+}
+
+function registrarMovimientoLog({ accion, hojaOrigen, hojaDestino, fila, estado, detalle }) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const hojaLog = obtenerHojaLog(ss);
+    const email = Session.getActiveUser().getEmail() || "desconocido";
+    hojaLog.appendRow([
+      new Date(),
+      accion || "",
+      hojaOrigen || "",
+      hojaDestino || "",
+      fila || "",
+      estado || "",
+      detalle || "",
+      email
+    ]);
+  } catch (e) {
+    console.error("No se pudo registrar en log: " + e.message);
+  }
+}
+
+function obtenerHojaLog(ss) {
+  let hoja = ss.getSheetByName(CONFIG.HOJA_LOG);
+  if (!hoja) {
+    hoja = ss.insertSheet(CONFIG.HOJA_LOG);
+    hoja.getRange(1, 1, 1, 8).setValues([[
+      "FECHA_HORA",
+      "ACCION",
+      "HOJA_ORIGEN",
+      "HOJA_DESTINO",
+      "FILA",
+      "ESTADO",
+      "DETALLE",
+      "USUARIO"
+    ]]);
+    hoja.getRange(1, 1, 1, 8).setFontWeight("bold");
+    hoja.setFrozenRows(1);
+  }
+  return hoja;
 }

@@ -478,33 +478,36 @@
 
         function calcularResumen() {
             if (!PEDIDO) return;
-            let subEntregado = 0;
+            let subEntregadoBruto = 0;
+            let subBrutoPendiente = 0;
             document.querySelectorAll('.ep-qty').forEach(inp => {
                 let idx = parseInt(inp.dataset.idx);
                 let cant = parseFloat(inp.value) || 0;
                 const max = PEDIDO.productos[idx].cantidad;
                 if (cant > max) { inp.value = max; cant = max; }
                 if (cant < 0) { inp.value = 0; cant = 0; }
-                subEntregado += cant * PEDIDO.productos[idx].precio_unitario;
+                const precio = PEDIDO.productos[idx].precio_unitario;
+                subEntregadoBruto += cant * precio;
+                subBrutoPendiente += PEDIDO.productos[idx].cantidad * precio;
             });
 
-            const descPct = PEDIDO.descuento_pct || 0;
-            const impPct = PEDIDO.impuesto_pct || 0;
-            const subConDesc = subEntregado * (1 - descPct);
-            const totalEntregado = subConDesc * (1 + impPct);
+            const ratioEntregado = subBrutoPendiente > 0 ? Math.max(0, Math.min(1, subEntregadoBruto / subBrutoPendiente)) : 0;
+            const ratioRestante = Math.max(0, 1 - ratioEntregado);
+            const subtotalPendiente = parseFloat(PEDIDO.subtotal) || 0;
+            const totalPendiente = parseFloat(PEDIDO.total) || 0;
+            const pagadoAcumulado = (parseFloat(PEDIDO.pagado_hasta_ahora) || 0) + (parseFloat(document.getElementById('pago_recibido').value) || 0);
 
-            let subRestante = 0;
-            document.querySelectorAll('.ep-qty').forEach(inp => {
-                const idx = parseInt(inp.dataset.idx);
-                const cant = parseFloat(inp.value) || 0;
-                subRestante += (PEDIDO.productos[idx].cantidad - cant) * PEDIDO.productos[idx].precio_unitario;
-            });
-            const totalRestante = subRestante * (1 - descPct) * (1 + impPct);
+            const subEntregado = subtotalPendiente * ratioEntregado;
+            const totalEntregado = totalPendiente * ratioEntregado;
+            const cuentaEntregada = pagadoAcumulado * ratioEntregado;
+            const totalEntregadoPendiente = Math.max(0, totalEntregado - cuentaEntregada);
+
             const pagoAhora = parseFloat(document.getElementById('pago_recibido').value) || 0;
-            const nuevoSaldo = totalRestante - pagoAhora;
+            const totalRestante = totalPendiente * ratioRestante;
+            const nuevoSaldo = Math.max(0, totalRestante - pagoAhora);
 
             document.getElementById('lbl_sub_entregado').innerText = fmtARS(subEntregado);
-            document.getElementById('lbl_total_entregado').innerText = fmtARS(totalEntregado);
+            document.getElementById('lbl_total_entregado').innerText = fmtARS(totalEntregadoPendiente);
             document.getElementById('lbl_pago_ahora').innerText = fmtARS(pagoAhora);
             document.getElementById('lbl_pendiente').innerText = fmtARS(nuevoSaldo);
         }
