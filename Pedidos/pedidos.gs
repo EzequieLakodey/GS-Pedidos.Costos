@@ -101,11 +101,11 @@ function onEditSimple(e) {
     if (colEstado > 0 && col === colEstado) {
       const valNorm = val.toString().trim().toUpperCase();
       if (name === CONFIG.HOJA_PEDIDOS) {
-        if (valNorm === "PRODUCIR" || valNorm === "Terminado") {
-          iniciarDecisionStockPorEstado(sheet, row, colEstado, valNorm, e.oldValue);
+        if (valNorm === "PRODUCIR" || valNorm === "TERMINADO") {
+          iniciarDecisionStockPorEstado(sheet, row, colEstado, val, e.oldValue);
           return;
         }
-        procesarFlujoPedidos(sheet, row, col, valNorm);
+        procesarFlujoPedidos(sheet, row, col, val);
       } else if (name === CONFIG.HOJA_TERMINADOS) {
         // En la hoja TERMINADOS, también manejamos ENTREGA PARCIAL
         if (valNorm === "ENTREGA PARCIAL") {
@@ -113,7 +113,7 @@ function onEditSimple(e) {
           PropertiesService.getScriptProperties().setProperty('HOJA_ENTREGA_PARCIAL', CONFIG.HOJA_TERMINADOS);
           abrirModalEntregaParcial();
         } else {
-          procesarFlujoTerminados(sheet, row, col, valNorm);
+          procesarFlujoTerminados(sheet, row, col, val);
         }
       }
     }
@@ -471,7 +471,7 @@ function procesarFlujoPedidos(hoja, fila, columna, valor) {
   const valNorm = valor.toString().trim().toUpperCase();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  if (valNorm === "Terminado") {
+  if (valNorm === "TERMINADO") {
     const destino = ss.getSheetByName(CONFIG.HOJA_TERMINADOS);
     if (!destino) return;
     transferirFilaDinamica(hoja, fila, destino);

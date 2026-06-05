@@ -219,11 +219,11 @@
             <div class="col-md-6">
                 <label class="form-label d-block">Moneda de Precios</label>
                 <div class="btn-group w-100" role="group">
-                    <input type="radio" class="btn-check" name="moneda" id="moneda_ars" value="ARS" checked
+                    <input type="radio" class="btn-check" name="moneda" id="moneda_ars" value="ARS"
                         onchange="cambiarMonedaGeneral(); calcularTotales()">
                     <label class="btn btn-outline-primary" for="moneda_ars">Pesos (ARS)</label>
 
-                    <input type="radio" class="btn-check" name="moneda" id="moneda_usd" value="USD"
+                    <input type="radio" checked class="btn-check" name="moneda" id="moneda_usd" value="USD"
                         onchange="cambiarMonedaGeneral(); calcularTotales()">
                     <label class="btn btn-outline-primary" for="moneda_usd">Dólares (USD)</label>
                 </div>
@@ -535,11 +535,11 @@
                     const priceType = row.querySelector('.prod-price-type').value;
                     const inputUsd = row.querySelector('.prod-price-usd');
                     const inputArs = row.querySelector('.prod-price-ars');
-                    
+
                     let usdPrice = (priceType === "PRECIO") ? (prodItem.precio || 0) : (prodItem.ultimoPrecio || prodItem.precio || 0);
                     const tc = parseFloat(document.getElementById('tc_valor').value) || 1;
                     const monedaGeneral = document.querySelector('input[name="moneda"]:checked').value;
-                    
+
                     inputUsd.value = usdPrice.toFixed(2);
                     inputArs.value = (usdPrice * tc).toFixed(2);
 
@@ -577,12 +577,12 @@
             const row = element.closest('.product-row');
             if (!row) return;
             const tc = parseFloat(document.getElementById('tc_valor').value) || 1;
-            
+
             const inputUsd = row.querySelector('.prod-price-usd');
             const inputArs = row.querySelector('.prod-price-ars');
-            
+
             let val = parseFloat(element.value) || 0;
-            
+
             if (sourceCurrency === 'USD') {
                 inputArs.value = (val * tc).toFixed(2);
             } else {
@@ -783,7 +783,7 @@
                     const catItem = CATALOGO.find(c => c.nombre === nombre);
                     let catStr = catItem ? catItem.categoria : "";
                     let modStr = catItem ? nombre.replace(catStr + " - ", "").trim() : nombre;
-                    
+
                     const monedaGeneral = document.querySelector('input[name="moneda"]:checked').value;
                     const precioUsd = parseFloat(row.querySelector('.prod-price-usd').value) || 0;
                     const precioArs = parseFloat(row.querySelector('.prod-price-ars').value) || 0;

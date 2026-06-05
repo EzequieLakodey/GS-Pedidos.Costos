@@ -1,18 +1,18 @@
 const CONFIG = {
     HOJA_MATERIALES: "Materiales",
-    HOJA_COSTOS: "Productos",
-    FILA_ENCABEZADOS_COSTOS: 2,
-    FILA_INICIO_DATOS_COSTOS: 3,
+    HOJA_PRODUCTOS: "Productos",
+    FILA_ENCABEZADOS_PRODUCTOS: 3,
+    FILA_INICIO_DATOS_PRODUCTOS: 4,
     FILA_ENCABEZADOS_MATERIALES: 1,
     FILA_INICIO_DATOS_MATERIALES: 2,
-    FILA_INICIO_DATOS: 3
+    FILA_INICIO_DATOS: 4
 };
 // Nombres exactos de headers
-const HEADERS_COSTOS = {
+const HEADERS_PRODUCTOS = {
     ID: "ID", CATEGORIA: "CATEGORIA", MODELO: "MODELO", MATERIALES: "MATERIALES",
     COSTO_MAT: "COSTO MAT", HORAS_MOBRA: "HORAS M.OBRA", MOBRA_USD: "M.OBRA USD",
     SUBTOTAL: "SUBTOTAL", DESPERDICIOS: "DESPERDICIOS", IMPUESTOS: "IMPUESTOS",
-    IMPORTES_IMP: "IMPORTES IMPUESTOS", TOTAL: "TOTAL", STOCK: "STOCK"
+    IMPORTES_IMP: "IMPORTES IMPUESTOS", TOTAL: "TOTAL", STOCK: "STOCK", PRECIO: "PRECIO", ULTIMO_PRECIO: "ULTIMO PRECIO"
 };
 const HEADERS_MATERIALES = {
     ID: "ID", CATEGORIA: "Categoria", DETALLES: "Detalles", UNIDAD: "Unidad de Medida",
@@ -71,7 +71,7 @@ function onEdit(e) {
     const fila = e.range.getRow();
     if (fila < CONFIG.FILA_INICIO_DATOS) return;
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const hojaCostos = ss.getSheetByName(CONFIG.HOJA_COSTOS);
+    const hojaCostos = ss.getSheetByName(CONFIG.HOJA_PRODUCTOS);
     if (!hojaCostos) return;
     const tc = parseFloat(hojaCostos.getRange("G1").getValue());
     if (!tc || isNaN(tc) || tc <= 0) return;
@@ -95,12 +95,12 @@ function gestionarMateriales() {
     try {
         const ss = SpreadsheetApp.getActiveSpreadsheet();
         const sheet = ss.getActiveSheet();
-        if (sheet.getName() !== CONFIG.HOJA_COSTOS) throw new Error('Debes estar en la hoja ' + CONFIG.HOJA_COSTOS);
+        if (sheet.getName() !== CONFIG.HOJA_PRODUCTOS) throw new Error('Debes estar en la hoja ' + CONFIG.HOJA_PRODUCTOS);
         const fila = sheet.getActiveCell().getRow();
-        if (fila < CONFIG.FILA_INICIO_DATOS_COSTOS) throw new Error('Selecciona una fila de productos válida.');
+        if (fila < CONFIG.FILA_INICIO_DATOS_PRODUCTOS) throw new Error('Selecciona una fila de productos válida.');
 
         PropertiesService.getScriptProperties().setProperty('FILA_ACTIVA', fila.toString());
-        const cols = getColMap(sheet, HEADERS_COSTOS, CONFIG.FILA_ENCABEZADOS_COSTOS);
+        const cols = getColMap(sheet, HEADERS_PRODUCTOS, CONFIG.FILA_ENCABEZADOS_PRODUCTOS);
 
         const materialesExistentes = sheet.getRange(fila, cols.MATERIALES).getValue();
         const esEdicion = materialesExistentes?.toString().trim() !== '';
@@ -118,9 +118,9 @@ function obtenerDatosIniciales() {
         const ss = SpreadsheetApp.getActiveSpreadsheet();
         const fila = parseInt(PropertiesService.getScriptProperties().getProperty('FILA_ACTIVA'));
 
-        const sheetCostos = ss.getSheetByName(CONFIG.HOJA_COSTOS);
+        const sheetCostos = ss.getSheetByName(CONFIG.HOJA_PRODUCTOS);
         // CORRECCIÓN: Usar sheetCostos en lugar de sheet (que no existía)
-        const colsCostos = getColMap(sheetCostos, HEADERS_COSTOS, CONFIG.FILA_ENCABEZADOS_COSTOS);
+        const colsCostos = getColMap(sheetCostos, HEADERS_PRODUCTOS, CONFIG.FILA_ENCABEZADOS_PRODUCTOS);
         const categoriaActual = sheetCostos.getRange(fila, colsCostos.CATEGORIA).getValue();
 
         const sheetCompras = ss.getSheetByName("Compras");
@@ -158,9 +158,9 @@ function obtenerDatosIniciales() {
 function obtenerMaterialesDeFila(fila, listaCoef) {
     try {
         const ss = SpreadsheetApp.getActiveSpreadsheet();
-        const sheetCostos = ss.getSheetByName(CONFIG.HOJA_COSTOS);
+        const sheetCostos = ss.getSheetByName(CONFIG.HOJA_PRODUCTOS);
         // CORRECCIÓN: Usar sheetCostos
-        const colsCostos = getColMap(sheetCostos, HEADERS_COSTOS, CONFIG.FILA_ENCABEZADOS_COSTOS);
+        const colsCostos = getColMap(sheetCostos, HEADERS_PRODUCTOS, CONFIG.FILA_ENCABEZADOS_PRODUCTOS);
         const texto = sheetCostos.getRange(fila, colsCostos.MATERIALES).getValue();
         if (!texto) return { materiales: [] };
 
@@ -198,8 +198,8 @@ function obtenerMaterialesDeFila(fila, listaCoef) {
 function guardarMateriales(materiales) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const fila = PropertiesService.getScriptProperties().getProperty('FILA_ACTIVA');
-    const sheet = ss.getSheetByName(CONFIG.HOJA_COSTOS);
-    const cols = getColMap(sheet, HEADERS_COSTOS, CONFIG.FILA_ENCABEZADOS_COSTOS);
+    const sheet = ss.getSheetByName(CONFIG.HOJA_PRODUCTOS);
+    const cols = getColMap(sheet, HEADERS_PRODUCTOS, CONFIG.FILA_ENCABEZADOS_PRODUCTOS);
     const texto = materiales.map(m =>
         `${m.categoria || 'S/C'} - ${m.proveedor || 'S/P'} - ${m.nombre} (${m.cantidad} ${m.unidad}) {W:${m.coefNombre || 'Ninguno'}}`
     ).join('\n');
@@ -219,8 +219,8 @@ function guardarMateriales(materiales) {
 function guardarPreset(nombre, materiales) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const fila = PropertiesService.getScriptProperties().getProperty('FILA_ACTIVA');
-    const sheet = ss.getSheetByName(CONFIG.HOJA_COSTOS);
-    const cols = getColMap(sheet, HEADERS_COSTOS, CONFIG.FILA_ENCABEZADOS_COSTOS);
+    const sheet = ss.getSheetByName(CONFIG.HOJA_PRODUCTOS);
+    const cols = getColMap(sheet, HEADERS_PRODUCTOS, CONFIG.FILA_ENCABEZADOS_PRODUCTOS);
     const cat = sheet.getRange(fila, cols.CATEGORIA).getValue();
     const sh = ss.getSheetByName('Presets') || ss.insertSheet('Presets').hideSheet();
     if (sh.getLastRow() === 0) sh.appendRow(['Categoría', 'Nombre', 'JSON']);
@@ -253,7 +253,7 @@ function limpiarMateriales() {
         const fila = sheet.getActiveCell().getRow();
         if (fila < CONFIG.FILA_INICIO_DATOS) return ui.alert('Selecciona una fila de datos');
         if (ui.alert('Confirmar', '¿Eliminar materiales de la fila ' + fila + '?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
-        const cols = getColMap(sheet, HEADERS_COSTOS, CONFIG.FILA_ENCABEZADOS_COSTOS);
+        const cols = getColMap(sheet, HEADERS_PRODUCTOS, CONFIG.FILA_ENCABEZADOS_PRODUCTOS);
         sheet.getRange(fila, cols.MATERIALES).setValue('');
         sheet.getRange(fila, cols.COSTO_MAT).setValue(0);
     } catch (e) { SpreadsheetApp.getUi().alert('Error: ' + e.message); }
@@ -262,7 +262,7 @@ function limpiarMateriales() {
 function modificarTipoCambio() {
     const ui = SpreadsheetApp.getUi();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const hojaCostos = ss.getSheetByName(CONFIG.HOJA_COSTOS);
+    const hojaCostos = ss.getSheetByName(CONFIG.HOJA_PRODUCTOS);
     const hojaMat = ss.getSheetByName(CONFIG.HOJA_MATERIALES);
     if (!hojaCostos || !hojaMat) return ui.alert('❌ Error', 'No se encontraron las hojas.', ui.ButtonSet.OK);
 
@@ -324,7 +324,7 @@ function aplicarAumentoMasivo(criterios) {
     const { proveedor, categoria, porcentaje } = criterios;
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const hojaMat = ss.getSheetByName(CONFIG.HOJA_MATERIALES);
-    const hojaCostos = ss.getSheetByName(CONFIG.HOJA_COSTOS);
+    const hojaCostos = ss.getSheetByName(CONFIG.HOJA_PRODUCTOS);
     if (!hojaMat) throw new Error('No se encontró la hoja "' + CONFIG.HOJA_MATERIALES + '".');
     const tc = hojaCostos ? (parseFloat(hojaCostos.getRange('G1').getValue()) || 1) : 1;
     const colsMat = getColMap(hojaMat, HEADERS_MATERIALES, CONFIG.FILA_ENCABEZADOS_MATERIALES);
