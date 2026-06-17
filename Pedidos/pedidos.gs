@@ -1212,7 +1212,11 @@ function parsearPedidoDetalle(textoPedido) {
   const colCat = headers.indexOf("CATEGORIA");
   const colMod = headers.indexOf("MODELO");
 
-  return textoPedido.toString().split('\n').map(linea => {
+  // Normalizar saltos de línea: Google Sheets puede usar \r\n, \r, o \n
+  const lineas = textoPedido.toString().replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
+  console.log("parsearPedidoDetalle: líneas encontradas = " + lineas.length + " => " + JSON.stringify(lineas));
+
+  return lineas.map(linea => {
     const partes = linea.split('|').map(s => s.trim());
     if (partes.length < 3) return null;
     const cantidad = parseFloat(partes[0]) || 0;
@@ -1226,7 +1230,10 @@ function parsearPedidoDetalle(textoPedido) {
       row[colCat].toString().trim().toUpperCase() === categoria.toUpperCase() &&
       row[colMod].toString().trim().toUpperCase() === modelo.toUpperCase()
     );
-    if (idx === -1) return null;
+    if (idx === -1) {
+      console.warn("parsearPedidoDetalle: producto no encontrado en hoja => cat: " + categoria + ", mod: " + modelo);
+      return null;
+    }
     return {
       id: data[idx][colId],
       categoria,

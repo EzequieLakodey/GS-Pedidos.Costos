@@ -205,8 +205,12 @@
                                         placeholder="Juan;María">
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-outline-primary w-100 mt-2"
-                                onclick="agregarNuevoCliente()">Agregar Cliente</button>
+                            <button type="button" class="btn btn-outline-primary w-100 mt-2" id="btnGuardarCliente"
+                                onclick="agregarNuevoCliente()">
+                                <span id="spinnerCliente" class="spinner-border spinner-border-sm d-none me-1"
+                                    role="status"></span>
+                                <span id="txtBtnCliente">Agregar Cliente</span>
+                            </button>
                         </div>
                         <datalist id="clientes-list"></datalist>
                     </div>
@@ -298,7 +302,7 @@
         <div class="row g-3 mb-4">
             <div class="col-md-6">
                 <label class="form-label">Plazo (Días)</label>
-                <input type="number" step="2" class="form-control" id="plazo" value="7">
+                <input type="number" step="1" class="form-control" id="plazo" value="7">
             </div>
             <div class="col-md-6">
                 <div class="section-title mb-2">Estado del Pedido</div>
@@ -425,10 +429,19 @@
                 alert('Debe completar al menos un campo.');
                 return;
             }
-            // Send to server
+
+            // Mostrar progreso
+            const btn = document.getElementById('btnGuardarCliente');
+            const spinner = document.getElementById('spinnerCliente');
+            const txtBtn = document.getElementById('txtBtnCliente');
+            btn.disabled = true;
+            spinner.classList.remove('d-none');
+            txtBtn.textContent = 'Guardando...';
+
             google.script.run
                 .withSuccessHandler(resp => {
                     if (resp.success) {
+                        txtBtn.textContent = 'Recargando clientes...';
                         // Reload client list
                         google.script.run
                             .withSuccessHandler(data => {
@@ -440,20 +453,38 @@
                                     opt.value = c.razon;
                                     dlC.appendChild(opt);
                                 });
+                                // Auto-seleccionar el nuevo cliente
+                                document.getElementById('cliente').value = razon.toUpperCase();
                                 // Reset form
                                 document.getElementById('nuevo-razon').value = '';
                                 document.getElementById('nuevo-alias').value = '';
                                 document.getElementById('nuevo-contacto').value = '';
                                 document.getElementById('form-nuevo-cliente').classList.add('d-none');
-                                alert('Cliente agregado correctamente.');
+                                // Restaurar botón
+                                btn.disabled = false;
+                                spinner.classList.add('d-none');
+                                txtBtn.textContent = 'Agregar Cliente';
                             })
-                            .withFailureHandler(err => alert('Error al recargar: ' + err.message))
-                            .obtenerDataInicialPedidos(); // re-fetch clients
+                            .withFailureHandler(err => {
+                                alert('Error al recargar: ' + err.message);
+                                btn.disabled = false;
+                                spinner.classList.add('d-none');
+                                txtBtn.textContent = 'Agregar Cliente';
+                            })
+                            .obtenerDataInicialPedidos();
                     } else {
                         alert('Error: ' + resp.message);
+                        btn.disabled = false;
+                        spinner.classList.add('d-none');
+                        txtBtn.textContent = 'Agregar Cliente';
                     }
                 })
-                .withFailureHandler(err => alert('Error de sistema: ' + err.message))
+                .withFailureHandler(err => {
+                    alert('Error de sistema: ' + err.message);
+                    btn.disabled = false;
+                    spinner.classList.add('d-none');
+                    txtBtn.textContent = 'Agregar Cliente';
+                })
                 .agregarCliente(razon, alias, contacto);
         }
 
