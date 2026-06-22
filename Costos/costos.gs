@@ -184,20 +184,17 @@ function obtenerDatosIniciales() {
             .getValue();
 
         const sheetCompras = ss.getSheetByName("Compras");
-        const coeficientes = [{ nombre: "Ninguno", valor: 0 }];
+        const coeficientes = [];
         if (sheetCompras) {
-            const ultima = sheetCompras.getLastRow();
-            if (ultima >= 3)
-                sheetCompras
-                    .getRange("O3:R" + ultima)
-                    .getValues()
-                    .forEach((r) => {
-                        if (r[0])
-                            coeficientes.push({
-                                nombre: r[0],
-                                valor: parseFloat(r[3]) || 0,
-                            });
-                    });
+            // Solo dejamos los coeficientes fijos de desperdicio de Cobre y Aluminio
+            const valQ4 =
+                parseFloat(sheetCompras.getRange("Q4").getValue()) || 0;
+            const valQ5 =
+                parseFloat(sheetCompras.getRange("Q5").getValue()) || 0;
+
+            coeficientes.push({ nombre: "Ninguno", valor: 0 });
+            coeficientes.push({ nombre: "Desperdicio Aluminio", valor: valQ4 });
+            coeficientes.push({ nombre: "Desperdicio Cobre", valor: valQ5 });
         }
 
         const hojaMat = ss.getSheetByName(CONFIG.HOJA_MATERIALES);
@@ -526,11 +523,10 @@ function generarIdUnico(hojaNombre, categoria) {
         i < data.length;
         i++
     ) {
-        if (
-            data[i][catCol]?.toString().trim().toUpperCase() === catUpper &&
-            typeof data[i][idCol] === "number"
-        ) {
-            if (data[i][idCol] > maxId) maxId = data[i][idCol];
+        const rowCat = data[i][catCol]?.toString().trim().toUpperCase();
+        const rowId = parseInt(data[i][idCol]);
+        if (rowCat === catUpper && !isNaN(rowId) && rowId >= inicio) {
+            if (rowId > maxId) maxId = rowId;
         }
     }
     return maxId + 1;
