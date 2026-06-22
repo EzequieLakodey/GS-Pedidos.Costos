@@ -1,13 +1,22 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <base target="_top">
     <meta charset="UTF-8">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         :root {
             --primary: #059669;
             --primary-dark: #047857;
@@ -25,9 +34,10 @@
             --text-3: #94a3b8;
             --radius: 12px;
             --radius-sm: 8px;
-            --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 8px 24px rgba(5,150,105,0.05);
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.07), 0 8px 24px rgba(5, 150, 105, 0.05);
             --transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
         body {
             font-family: 'Inter', sans-serif;
             background: linear-gradient(135deg, #f0fdf4 0%, #f8fafc 50%, #eff6ff 100%);
@@ -36,261 +46,507 @@
             font-size: 13.5px;
             line-height: 1.5;
         }
-        .page-wrapper { max-width: 660px; margin: 0 auto; }
+
+        .page-wrapper {
+            max-width: 660px;
+            margin: 0 auto;
+        }
 
         /* Header */
-        .page-header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
-        .page-header .icon {
-            width: 40px; height: 40px;
-            background: linear-gradient(135deg, var(--primary), var(--accent));
-            border-radius: 10px; display: flex; align-items: center; justify-content: center;
-            font-size: 18px; box-shadow: 0 4px 12px rgba(5,150,105,0.3);
+        .page-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
         }
-        .page-header h1 { font-size: 1.1rem; font-weight: 700; }
-        .page-header p  { font-size: 0.78rem; color: var(--text-2); }
+
+        .page-header .icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+        }
+
+        .page-header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .page-header p {
+            font-size: 0.78rem;
+            color: var(--text-2);
+        }
 
         /* Cards */
         .card {
-            background: var(--surface); border: 1px solid var(--border);
-            border-radius: var(--radius); box-shadow: var(--shadow);
-            padding: 18px 20px; margin-bottom: 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 18px 20px;
+            margin-bottom: 14px;
         }
+
         .card-title {
-            font-size: 0.76rem; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 0.7px; color: var(--primary); margin-bottom: 14px;
-            padding-bottom: 8px; border-bottom: 1.5px solid #d1fae5;
-            display: flex; align-items: center; justify-content: space-between;
+            font-size: 0.76rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            color: var(--primary);
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1.5px solid #d1fae5;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         /* Preset Bar */
         .preset-bar {
             background: linear-gradient(135deg, #fffbeb, #fef3c7);
-            border: 1.5px solid #fde68a; border-radius: var(--radius);
-            padding: 14px 16px; margin-bottom: 14px;
+            border: 1.5px solid #fde68a;
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            margin-bottom: 14px;
         }
-        .preset-bar-title { font-size: 0.78rem; font-weight: 700; color: var(--amber); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
-        .preset-row { display: flex; gap: 8px; align-items: center; }
-        .preset-row + .preset-row { margin-top: 8px; }
+
+        .preset-bar-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--amber);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .preset-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .preset-row+.preset-row {
+            margin-top: 8px;
+        }
 
         /* Form fields */
-        label { display: block; font-size: 0.76rem; font-weight: 600; color: var(--text-2); margin-bottom: 4px; letter-spacing: 0.2px; }
-        input[type="text"], input[type="number"], select {
-            width: 100%; padding: 8px 11px; border: 1.5px solid var(--border);
-            border-radius: var(--radius-sm); font-family: 'Inter', sans-serif;
-            font-size: 13.5px; color: var(--text); background: var(--surface);
-            transition: var(--transition); outline: none; appearance: none;
+        label {
+            display: block;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--text-2);
+            margin-bottom: 4px;
+            letter-spacing: 0.2px;
         }
-        input:focus, select:focus { border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(52,211,153,0.15); }
-        input::placeholder { color: var(--text-3); }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 8px 11px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-family: 'Inter', sans-serif;
+            font-size: 13.5px;
+            color: var(--text);
+            background: var(--surface);
+            transition: var(--transition);
+            outline: none;
+            appearance: none;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15);
+        }
+
+        input::placeholder {
+            color: var(--text-3);
+        }
 
         /* Material item */
         .material-item {
-            background: var(--surface-2); border: 1.5px solid var(--border);
-            border-radius: var(--radius); padding: 14px;
-            margin-bottom: 10px; transition: var(--transition);
+            background: var(--surface-2);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px;
+            margin-bottom: 10px;
+            transition: var(--transition);
         }
-        .material-item:hover { border-color: #86efac; box-shadow: 0 4px 16px rgba(5,150,105,0.07); }
-        .mat-header { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
-        .mat-header .sel-wrapper { flex: 1; position: relative; }
-        .mat-header .sel-wrapper::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; font-size: 11px; }
-        .mat-header select { padding-right: 28px; font-size: 12.5px; }
-        .mat-selector { width: 100%; margin-bottom: 10px; }
-        .mat-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .mat-controls .field { }
-        .mat-controls .field label { font-size: 0.72rem; }
-        .qty-row { display: flex; gap: 8px; align-items: center; }
-        .qty-row input { flex: 1; }
+
+        .material-item:hover {
+            border-color: #86efac;
+            box-shadow: 0 4px 16px rgba(5, 150, 105, 0.07);
+        }
+
+        .mat-header {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .mat-header .sel-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .mat-header .sel-wrapper::after {
+            content: '▾';
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-3);
+            pointer-events: none;
+            font-size: 11px;
+        }
+
+        .mat-header select {
+            padding-right: 28px;
+            font-size: 12.5px;
+        }
+
+        .mat-selector {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .mat-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .mat-controls .field {}
+
+        .mat-controls .field label {
+            font-size: 0.72rem;
+        }
+
+        .qty-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .qty-row input {
+            flex: 1;
+        }
+
         .unit-badge {
-            font-size: 0.72rem; font-weight: 700; color: var(--primary-dark);
-            background: #d1fae5; border-radius: 6px; padding: 2px 8px;
-            white-space: nowrap; min-width: 32px; text-align: center;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            background: #d1fae5;
+            border-radius: 6px;
+            padding: 2px 8px;
+            white-space: nowrap;
+            min-width: 32px;
+            text-align: center;
         }
+
         .price-info {
             background: linear-gradient(135deg, #ecfdf5, #d1fae5);
-            border: 1px solid #a7f3d0; border-radius: 8px;
-            padding: 7px 11px; margin-top: 10px;
-            font-size: 0.78rem; font-weight: 600; color: var(--primary-dark);
+            border: 1px solid #a7f3d0;
+            border-radius: 8px;
+            padding: 7px 11px;
+            margin-top: 10px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--primary-dark);
         }
 
         /* Total box */
         .total-box {
             background: linear-gradient(135deg, #0f172a, #052e16);
-            border-radius: var(--radius); padding: 16px 20px;
-            color: #e2e8f0; margin-bottom: 14px;
-            box-shadow: 0 8px 30px rgba(15,23,42,0.2);
-            font-size: 1rem; font-weight: 700;
-            display: flex; align-items: center; justify-content: space-between;
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            color: #e2e8f0;
+            margin-bottom: 14px;
+            box-shadow: 0 8px 30px rgba(15, 23, 42, 0.2);
+            font-size: 1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        .total-box .total-label { color: #94a3b8; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-        .total-box .total-val { font-size: 1.5rem; font-weight: 800; color: var(--primary-light); }
-        .total-box .total-waste { font-size: 0.78rem; color: #fbbf24; margin-top: 2px; }
+
+        .total-box .total-label {
+            color: #94a3b8;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .total-box .total-val {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary-light);
+        }
+
+        .total-box .total-waste {
+            font-size: 0.78rem;
+            color: #fbbf24;
+            margin-top: 2px;
+        }
 
         /* Buttons */
         .btn {
-            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-            padding: 9px 16px; border-radius: var(--radius-sm); border: none;
-            font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
-            cursor: pointer; transition: var(--transition); outline: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 16px;
+            border-radius: var(--radius-sm);
+            border: none;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            outline: none;
         }
-        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; box-shadow: 0 4px 12px rgba(5,150,105,0.25); }
-        .btn-primary:hover { box-shadow: 0 6px 20px rgba(5,150,105,0.4); transform: translateY(-1px); }
-        .btn-amber { background: linear-gradient(135deg, var(--amber), #b45309); color: white; box-shadow: 0 4px 12px rgba(217,119,6,0.25); }
-        .btn-amber:hover { box-shadow: 0 6px 20px rgba(217,119,6,0.4); transform: translateY(-1px); }
-        .btn-blue { background: linear-gradient(135deg, var(--blue), #1e40af); color: white; }
-        .btn-ghost { background: var(--surface-2); border: 1.5px solid var(--border); color: var(--text-2); }
-        .btn-ghost:hover { background: var(--surface-3); }
-        .btn-danger-ghost { background: transparent; border: 1.5px solid #fca5a5; color: var(--danger); padding: 4px 8px; border-radius: 6px; font-size: 11px; }
-        .btn-danger-ghost:hover { background: #fee2e2; }
-        .btn-sm { padding: 5px 10px; font-size: 12px; }
-        .btn-full { width: 100%; padding: 13px; font-size: 14px; border-radius: 10px; letter-spacing: 0.3px; }
 
-        .action-row { display: flex; justify-content: space-between; gap: 10px; }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-amber {
+            background: linear-gradient(135deg, var(--amber), #b45309);
+            color: white;
+            box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25);
+        }
+
+        .btn-amber:hover {
+            box-shadow: 0 6px 20px rgba(217, 119, 6, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-blue {
+            background: linear-gradient(135deg, var(--blue), #1e40af);
+            color: white;
+        }
+
+        .btn-ghost {
+            background: var(--surface-2);
+            border: 1.5px solid var(--border);
+            color: var(--text-2);
+        }
+
+        .btn-ghost:hover {
+            background: var(--surface-3);
+        }
+
+        .btn-danger-ghost {
+            background: transparent;
+            border: 1.5px solid #fca5a5;
+            color: var(--danger);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+        }
+
+        .btn-danger-ghost:hover {
+            background: #fee2e2;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .btn-full {
+            width: 100%;
+            padding: 13px;
+            font-size: 14px;
+            border-radius: 10px;
+            letter-spacing: 0.3px;
+        }
+
+        .action-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
 
         .spinner {
-            width: 16px; height: 16px; border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
-            animation: spin 0.7s linear infinite; display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            animation: spin 0.7s linear infinite;
+            display: inline-block;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
 
-        .hidden { display: none !important; }
-        .loading-note { text-align: center; padding: 20px; color: var(--text-3); font-style: italic; }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .loading-note {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-3);
+            font-style: italic;
+        }
     </style>
 </head>
+
 <body>
-<div class="page-wrapper">
+    <div class="page-wrapper">
 
-    <div class="page-header">
-        <div class="icon">⚙️</div>
-        <div>
-            <h1>Materiales del Producto</h1>
-            <p>Fila activa: <strong id="lbl_fila">—</strong></p>
-        </div>
-    </div>
-
-    <!-- Presets -->
-    <div class="preset-bar">
-        <div class="preset-bar-title">💾 Presets Guardados</div>
-        <div class="preset-row">
-            <div class="sel-wrapper" style="flex:2; position:relative;">
-                <select id="selector-presets" style="padding-right:28px;">
-                    <option value="">Cargando presets...</option>
-                </select>
+        <div class="page-header">
+            <div class="icon">⚙️</div>
+            <div>
+                <h1>Materiales del Producto</h1>
+                <p>Fila activa: <strong id="lbl_fila">—</strong></p>
             </div>
-            <button class="btn btn-amber btn-sm" onclick="cargarPreset()">📥 Cargar</button>
         </div>
-        <div class="preset-row">
-            <input type="text" id="nombre-nuevo-preset" placeholder="Nombre para guardar preset..." style="flex:2;">
-            <button class="btn btn-blue btn-sm" onclick="guardarComoPreset()">💾 Guardar preset</button>
+
+        <!-- Presets -->
+        <div class="preset-bar">
+            <div class="preset-bar-title">💾 Presets Guardados</div>
+            <div class="preset-row">
+                <div class="sel-wrapper" style="flex:2; position:relative;">
+                    <select id="selector-presets" style="padding-right:28px;">
+                        <option value="">Cargando presets...</option>
+                    </select>
+                </div>
+                <button class="btn btn-amber btn-sm" onclick="cargarPreset()">📥 Cargar</button>
+            </div>
+            <div class="preset-row">
+                <input type="text" id="nombre-nuevo-preset" placeholder="Nombre para guardar preset..." style="flex:2;">
+                <button class="btn btn-blue btn-sm" onclick="guardarComoPreset()">💾 Guardar preset</button>
+            </div>
         </div>
+
+        <!-- Materiales -->
+        <div class="card">
+            <div class="card-title">
+                🧱 Lista de Materiales
+                <button class="btn btn-ghost btn-sm" onclick="agregarMaterial()">+ Agregar material</button>
+            </div>
+            <div id="materiales-container">
+                <div class="loading-note">Cargando datos...</div>
+            </div>
+        </div>
+
+        <!-- Total -->
+        <div class="total-box" id="total-box">
+            <div>
+                <div class="total-label">Costo total de materiales</div>
+                <div class="total-waste hidden" id="total-waste"></div>
+            </div>
+            <div class="total-val" id="total-val">$0,00</div>
+        </div>
+
+        <!-- Actions -->
+        <div class="action-row">
+            <button class="btn btn-ghost" onclick="google.script.host.close()">✕ Cancelar</button>
+            <button class="btn btn-primary" onclick="guardar()">✅ Guardar en Planilla</button>
+        </div>
+        <div style="height:16px;"></div>
     </div>
 
-    <!-- Materiales -->
-    <div class="card">
-        <div class="card-title">
-            🧱 Lista de Materiales
-            <button class="btn btn-ghost btn-sm" onclick="agregarMaterial()">+ Agregar material</button>
-        </div>
-        <div id="materiales-container">
-            <div class="loading-note">Cargando datos...</div>
-        </div>
-    </div>
+    <script>
+        let materialesSeleccionados = [];
+        let catalogoMateriales = [];
+        let proveedoresUnicos = [];
+        let categoriasUnicas = [];
+        let categoriasPorProveedor = {};
+        let presetsGuardados = [];
+        let coeficientesDisponibles = [];
+        const filaActiva = <?= filaActiva ?>;
 
-    <!-- Total -->
-    <div class="total-box" id="total-box">
-        <div>
-            <div class="total-label">Costo total de materiales</div>
-            <div class="total-waste hidden" id="total-waste"></div>
-        </div>
-        <div class="total-val" id="total-val">$0,00</div>
-    </div>
+        document.getElementById('lbl_fila').innerText = filaActiva;
 
-    <!-- Actions -->
-    <div class="action-row">
-        <button class="btn btn-ghost" onclick="google.script.host.close()">✕ Cancelar</button>
-        <button class="btn btn-primary" onclick="guardar()">✅ Guardar en Planilla</button>
-    </div>
-    <div style="height:16px;"></div>
-</div>
+        window.onload = function () {
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    if (!res.success) { alert("Error crítico: " + res.message); return; }
 
-<script>
-    let materialesSeleccionados = [];
-    let catalogoMateriales = [];
-    let proveedoresUnicos = [];
-    let categoriasUnicas = [];
-    let categoriasPorProveedor = {};
-    let presetsGuardados = [];
-    let coeficientesDisponibles = [];
-    const filaActiva = <?= filaActiva ?>;
+                    catalogoMateriales = res.catalogo || [];
+                    coeficientesDisponibles = res.coeficientes || [];
+                    presetsGuardados = res.presets || [];
 
-    document.getElementById('lbl_fila').innerText = filaActiva;
+                    const proveedores = new Set(), categorias = new Set();
+                    catalogoMateriales.forEach(m => {
+                        if (m.proveedor) {
+                            proveedores.add(m.proveedor);
+                            if (!categoriasPorProveedor[m.proveedor]) categoriasPorProveedor[m.proveedor] = new Set();
+                            if (m.categoria) { categoriasPorProveedor[m.proveedor].add(m.categoria); categorias.add(m.categoria); }
+                        }
+                    });
+                    proveedoresUnicos = Array.from(proveedores).sort();
+                    categoriasUnicas = Array.from(categorias).sort();
+                    Object.keys(categoriasPorProveedor).forEach(p => {
+                        categoriasPorProveedor[p] = Array.from(categoriasPorProveedor[p]).sort();
+                    });
 
-    window.onload = function () {
-        google.script.run
-            .withSuccessHandler(function (res) {
-                if (!res.success) { alert("Error crítico: " + res.message); return; }
-
-                catalogoMateriales = res.catalogo || [];
-                coeficientesDisponibles = res.coeficientes || [];
-                presetsGuardados = res.presets || [];
-
-                const proveedores = new Set(), categorias = new Set();
-                catalogoMateriales.forEach(m => {
-                    if (m.proveedor) {
-                        proveedores.add(m.proveedor);
-                        if (!categoriasPorProveedor[m.proveedor]) categoriasPorProveedor[m.proveedor] = new Set();
-                        if (m.categoria) { categoriasPorProveedor[m.proveedor].add(m.categoria); categorias.add(m.categoria); }
+                    const selP = document.getElementById('selector-presets');
+                    if (presetsGuardados.length === 0) {
+                        selP.innerHTML = `<option value="">Sin presets para: ${res.categoriaActual || 'esta categoría'}</option>`;
+                    } else {
+                        selP.innerHTML = '<option value="">Selecciona un preset...</option>';
+                        presetsGuardados.forEach((p, i) => selP.innerHTML += `<option value="${i}">📁 ${p.nombre}</option>`);
                     }
-                });
-                proveedoresUnicos = Array.from(proveedores).sort();
-                categoriasUnicas  = Array.from(categorias).sort();
-                Object.keys(categoriasPorProveedor).forEach(p => {
-                    categoriasPorProveedor[p] = Array.from(categoriasPorProveedor[p]).sort();
-                });
 
-                const selP = document.getElementById('selector-presets');
-                if (presetsGuardados.length === 0) {
-                    selP.innerHTML = `<option value="">Sin presets para: ${res.categoriaActual || 'esta categoría'}</option>`;
-                } else {
-                    selP.innerHTML = '<option value="">Selecciona un preset...</option>';
-                    presetsGuardados.forEach((p, i) => selP.innerHTML += `<option value="${i}">📁 ${p.nombre}</option>`);
-                }
+                    document.getElementById('materiales-container').innerHTML = '';
+                    if (res.materialesFila && res.materialesFila.length > 0) {
+                        res.materialesFila.forEach(m => agregarMaterialConDatos(m));
+                    } else {
+                        agregarMaterial();
+                    }
+                })
+                .obtenerDatosIniciales();
+        };
 
-                document.getElementById('materiales-container').innerHTML = '';
-                if (res.materialesFila && res.materialesFila.length > 0) {
-                    res.materialesFila.forEach(m => agregarMaterialConDatos(m));
-                } else {
-                    agregarMaterial();
-                }
-            })
-            .obtenerDatosIniciales();
-    };
+        function agregarMaterial() {
+            agregarMaterialConDatos({ nombre: '', unidad: '', cantidad: 1, precio: 0, categoria: '', proveedor: 'TODOS', coefNombre: 'Ninguno', coefValor: 0 });
+        }
 
-    function agregarMaterial() {
-        agregarMaterialConDatos({ nombre: '', unidad: '', cantidad: 1, precio: 0, categoria: '', proveedor: 'TODOS', coefNombre: 'Ninguno', coefValor: 0 });
-    }
+        function agregarMaterialConDatos(material) {
+            const index = materialesSeleccionados.length;
+            const container = document.getElementById('materiales-container');
+            const div = document.createElement('div');
+            div.className = 'material-item';
+            div.id = 'material-' + index;
 
-    function agregarMaterialConDatos(material) {
-        const index = materialesSeleccionados.length;
-        const container = document.getElementById('materiales-container');
-        const div = document.createElement('div');
-        div.className = 'material-item';
-        div.id = 'material-' + index;
+            let opcionesProveedor = '<option value="TODOS">🏭 Todos los proveedores</option>';
+            proveedoresUnicos.forEach(p => {
+                opcionesProveedor += `<option value="${p}" ${p === material.proveedor ? 'selected' : ''}>${p}</option>`;
+            });
 
-        let opcionesProveedor = '<option value="TODOS">🏭 Todos los proveedores</option>';
-        proveedoresUnicos.forEach(p => {
-            opcionesProveedor += `<option value="${p}" ${p === material.proveedor ? 'selected' : ''}>${p}</option>`;
-        });
+            let opcionesCategoria = generarOpcionesCategoria(material.proveedor, material.categoria);
 
-        let opcionesCategoria = generarOpcionesCategoria(material.proveedor, material.categoria);
+            let opcionesCoef = '';
+            coeficientesDisponibles.forEach(c => {
+                const pct = (c.valor * 100).toFixed(2);
+                opcionesCoef += `<option value="${c.valor}" data-nombre="${c.nombre}" ${c.nombre === material.coefNombre ? 'selected' : ''}>♻️ ${c.nombre} (${pct}%)</option>`;
+            });
 
-        let opcionesCoef = '';
-        coeficientesDisponibles.forEach(c => {
-            const pct = (c.valor * 100).toFixed(2);
-            opcionesCoef += `<option value="${c.valor}" data-nombre="${c.nombre}" ${c.nombre === material.coefNombre ? 'selected' : ''}>♻️ ${c.nombre} (${pct}%)</option>`;
-        });
-
-        div.innerHTML = `
+            div.innerHTML = `
             <div class="mat-header">
                 <div class="sel-wrapper" style="flex:1">
                     <select id="proveedor-${index}" onchange="cambiarProveedor(${index}, this)">${opcionesProveedor}</select>
@@ -323,146 +579,147 @@
             <div class="price-info hidden" id="precio-${index}"></div>
         `;
 
-        container.appendChild(div);
-        materialesSeleccionados.push({ ...material, coefNombre: material.coefNombre || 'Ninguno', coefValor: material.coefValor || 0 });
+            container.appendChild(div);
+            materialesSeleccionados.push({ ...material, coefNombre: material.coefNombre || 'Ninguno', coefValor: material.coefValor || 0 });
 
-        setTimeout(() => {
-            actualizarSelectorMateriales(index, material.proveedor, material.categoria);
-            if (material.nombre) {
-                document.getElementById('selector-' + index).value = material.nombre;
-                actualizarPrecioInfo(index);
-            }
-        }, 50);
+            setTimeout(() => {
+                actualizarSelectorMateriales(index, material.proveedor, material.categoria);
+                if (material.nombre) {
+                    document.getElementById('selector-' + index).value = material.nombre;
+                    actualizarPrecioInfo(index);
+                }
+            }, 50);
 
-        actualizarTotal();
-    }
+            actualizarTotal();
+        }
 
-    function generarOpcionesCategoria(proveedor, categoriaSeleccionada = '') {
-        let opciones = '<option value="TODAS">📋 Todas las categorías</option>';
-        let cats = (proveedor && proveedor !== 'TODOS') ? categoriasPorProveedor[proveedor] : categoriasUnicas;
-        if (cats) cats.forEach(c => { opciones += `<option value="${c}" ${c === categoriaSeleccionada ? 'selected' : ''}>📌 ${c}</option>`; });
-        return opciones;
-    }
+        function generarOpcionesCategoria(proveedor, categoriaSeleccionada = '') {
+            let opciones = '<option value="TODAS">📋 Todas las categorías</option>';
+            let cats = (proveedor && proveedor !== 'TODOS') ? categoriasPorProveedor[proveedor] : categoriasUnicas;
+            if (cats) cats.forEach(c => { opciones += `<option value="${c}" ${c === categoriaSeleccionada ? 'selected' : ''}>📌 ${c}</option>`; });
+            return opciones;
+        }
 
-    function cambiarProveedor(index, select) {
-        document.getElementById('categoria-' + index).innerHTML = generarOpcionesCategoria(select.value);
-        actualizarSelectorMateriales(index, select.value, 'TODAS');
-    }
+        function cambiarProveedor(index, select) {
+            document.getElementById('categoria-' + index).innerHTML = generarOpcionesCategoria(select.value);
+            actualizarSelectorMateriales(index, select.value, 'TODAS');
+        }
 
-    function cambiarCategoria(index, select) {
-        actualizarSelectorMateriales(index, document.getElementById('proveedor-' + index).value, select.value);
-    }
+        function cambiarCategoria(index, select) {
+            actualizarSelectorMateriales(index, document.getElementById('proveedor-' + index).value, select.value);
+        }
 
-    function actualizarSelectorMateriales(index, proveedor, categoria) {
-        const selector = document.getElementById('selector-' + index);
-        selector.innerHTML = '<option value="">Seleccionar material...</option>';
-        let filtrados = catalogoMateriales;
-        if (proveedor && proveedor !== 'TODOS') filtrados = filtrados.filter(m => m.proveedor === proveedor);
-        if (categoria && categoria !== 'TODAS') filtrados = filtrados.filter(m => m.categoria === categoria);
-        const porProv = {};
-        filtrados.forEach(m => { if (!porProv[m.proveedor]) porProv[m.proveedor] = []; porProv[m.proveedor].push(m); });
-        Object.keys(porProv).sort().forEach(p => {
-            const group = document.createElement('optgroup');
-            group.label = `🏭 ${p}`;
-            porProv[p].forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m.nombre;
-                opt.textContent = `${m.nombre}  ($${m.precio} / ${m.unidad})`;
-                group.appendChild(opt);
+        function actualizarSelectorMateriales(index, proveedor, categoria) {
+            const selector = document.getElementById('selector-' + index);
+            selector.innerHTML = '<option value="">Seleccionar material...</option>';
+            let filtrados = catalogoMateriales;
+            if (proveedor && proveedor !== 'TODOS') filtrados = filtrados.filter(m => m.proveedor === proveedor);
+            if (categoria && categoria !== 'TODAS') filtrados = filtrados.filter(m => m.categoria === categoria);
+            const porProv = {};
+            filtrados.forEach(m => { if (!porProv[m.proveedor]) porProv[m.proveedor] = []; porProv[m.proveedor].push(m); });
+            Object.keys(porProv).sort().forEach(p => {
+                const group = document.createElement('optgroup');
+                group.label = `🏭 ${p}`;
+                porProv[p].forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.nombre;
+                    opt.textContent = `${m.nombre}  ($${m.precio} / ${m.unidad})`;
+                    group.appendChild(opt);
+                });
+                selector.appendChild(group);
             });
-            selector.appendChild(group);
-        });
-    }
+        }
 
-    function materialCambiado(index, select) {
-        const mat = catalogoMateriales.find(m => m.nombre === select.value);
-        if (mat) {
-            materialesSeleccionados[index] = { ...mat, cantidad: materialesSeleccionados[index].cantidad || 1, coefNombre: materialesSeleccionados[index].coefNombre || 'Ninguno', coefValor: materialesSeleccionados[index].coefValor || 0 };
-            document.getElementById('unidad-' + index).textContent = mat.unidad || '—';
+        function materialCambiado(index, select) {
+            const mat = catalogoMateriales.find(m => m.nombre === select.value);
+            if (mat) {
+                materialesSeleccionados[index] = { ...mat, cantidad: materialesSeleccionados[index].cantidad || 1, coefNombre: materialesSeleccionados[index].coefNombre || 'Ninguno', coefValor: materialesSeleccionados[index].coefValor || 0 };
+                document.getElementById('unidad-' + index).textContent = mat.unidad || '—';
+                actualizarPrecioInfo(index);
+                actualizarTotal();
+            }
+        }
+
+        function cantidadCambiada(index, input) {
+            if (materialesSeleccionados[index]) {
+                materialesSeleccionados[index].cantidad = parseFloat(input.value) || 0;
+                actualizarPrecioInfo(index);
+                actualizarTotal();
+            }
+        }
+
+        function coeficienteCambiado(index, select) {
+            const opt = select.options[select.selectedIndex];
+            materialesSeleccionados[index].coefNombre = opt.getAttribute('data-nombre');
+            materialesSeleccionados[index].coefValor = parseFloat(select.value);
             actualizarPrecioInfo(index);
             actualizarTotal();
         }
-    }
 
-    function cantidadCambiada(index, input) {
-        if (materialesSeleccionados[index]) {
-            materialesSeleccionados[index].cantidad = parseFloat(input.value) || 0;
-            actualizarPrecioInfo(index);
+        function actualizarPrecioInfo(index) {
+            const m = materialesSeleccionados[index];
+            const el = document.getElementById('precio-' + index);
+            if (m && m.nombre) {
+                const base = (m.precio || 0) * (m.cantidad || 0);
+                const desp = base * (m.coefValor || 0);
+                const total = base + desp;
+                el.classList.remove('hidden');
+                el.innerHTML = `💰 Subtotal: <strong>$${total.toFixed(2)}</strong>` +
+                    (desp > 0 ? ` <span style="color:var(--amber);font-size:0.72rem;">(inc. $${desp.toFixed(2)} de desperdicio)</span>` : '');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        function actualizarTotal() {
+            let totalBase = 0, totalDesperdicio = 0;
+            materialesSeleccionados.forEach(m => {
+                const sub = (m.precio || 0) * (m.cantidad || 0);
+                const desp = sub * (m.coefValor || 0);
+                totalBase += sub; totalDesperdicio += desp;
+            });
+            const totalFinal = totalBase + totalDesperdicio;
+            document.getElementById('total-val').innerText = '$' + totalFinal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const wasteEl = document.getElementById('total-waste');
+            if (totalDesperdicio > 0) {
+                wasteEl.classList.remove('hidden');
+                wasteEl.innerText = `Incl. $${totalDesperdicio.toFixed(2)} de desperdicio`;
+            } else { wasteEl.classList.add('hidden'); }
+        }
+
+        function eliminarMaterial(index) {
+            document.getElementById('material-' + index).remove();
+            materialesSeleccionados.splice(index, 1);
             actualizarTotal();
         }
-    }
 
-    function coeficienteCambiado(index, select) {
-        const opt = select.options[select.selectedIndex];
-        materialesSeleccionados[index].coefNombre = opt.getAttribute('data-nombre');
-        materialesSeleccionados[index].coefValor  = parseFloat(select.value);
-        actualizarPrecioInfo(index);
-        actualizarTotal();
-    }
-
-    function actualizarPrecioInfo(index) {
-        const m = materialesSeleccionados[index];
-        const el = document.getElementById('precio-' + index);
-        if (m && m.nombre) {
-            const base = (m.precio || 0) * (m.cantidad || 0);
-            const desp = base * (m.coefValor || 0);
-            const total = base + desp;
-            el.classList.remove('hidden');
-            el.innerHTML = `💰 Subtotal: <strong>$${total.toFixed(2)}</strong>` +
-                (desp > 0 ? ` <span style="color:var(--amber);font-size:0.72rem;">(inc. $${desp.toFixed(2)} de desperdicio)</span>` : '');
-        } else {
-            el.classList.add('hidden');
+        function guardar() {
+            const validos = materialesSeleccionados.filter(m => m.nombre && m.cantidad > 0);
+            google.script.run
+                .withSuccessHandler(() => google.script.host.close())
+                .guardarMateriales(validos);
         }
-    }
 
-    function actualizarTotal() {
-        let totalBase = 0, totalDesperdicio = 0;
-        materialesSeleccionados.forEach(m => {
-            const sub  = (m.precio || 0) * (m.cantidad || 0);
-            const desp = sub * (m.coefValor || 0);
-            totalBase += sub; totalDesperdicio += desp;
-        });
-        const totalFinal = totalBase + totalDesperdicio;
-        document.getElementById('total-val').innerText = '$' + totalFinal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const wasteEl = document.getElementById('total-waste');
-        if (totalDesperdicio > 0) {
-            wasteEl.classList.remove('hidden');
-            wasteEl.innerText = `Incl. $${totalDesperdicio.toFixed(2)} de desperdicio`;
-        } else { wasteEl.classList.add('hidden'); }
-    }
-
-    function eliminarMaterial(index) {
-        document.getElementById('material-' + index).remove();
-        materialesSeleccionados.splice(index, 1);
-        actualizarTotal();
-    }
-
-    function guardar() {
-        const validos = materialesSeleccionados.filter(m => m.nombre && m.cantidad > 0);
-        google.script.run
-            .withSuccessHandler(() => google.script.host.close())
-            .guardarMateriales(validos);
-    }
-
-    function guardarComoPreset() {
-        const nombre = document.getElementById('nombre-nuevo-preset').value.trim();
-        const validos = materialesSeleccionados.filter(m => m.nombre && m.cantidad > 0);
-        if (!nombre) { alert('Ingresa un nombre para el preset.'); return; }
-        google.script.run
-            .withSuccessHandler(() => { alert('✅ Preset guardado exitosamente.'); location.reload(); })
-            .guardarPreset(nombre, validos);
-    }
-
-    function cargarPreset() {
-        const idx = document.getElementById('selector-presets').value;
-        if (idx === '') return;
-        const preset = presetsGuardados[idx];
-        if (confirm(`¿Cargar el preset "${preset.nombre}"? Se reemplazarán los materiales actuales.`)) {
-            document.getElementById('materiales-container').innerHTML = '';
-            materialesSeleccionados = [];
-            preset.datos.forEach(m => agregarMaterialConDatos(m));
+        function guardarComoPreset() {
+            const nombre = document.getElementById('nombre-nuevo-preset').value.trim();
+            const validos = materialesSeleccionados.filter(m => m.nombre && m.cantidad > 0);
+            if (!nombre) { alert('Ingresa un nombre para el preset.'); return; }
+            google.script.run
+                .withSuccessHandler(() => { alert('✅ Preset guardado exitosamente.'); location.reload(); })
+                .guardarPreset(nombre, validos);
         }
-    }
-</script>
+
+        function cargarPreset() {
+            const idx = document.getElementById('selector-presets').value;
+            if (idx === '') return;
+            const preset = presetsGuardados[idx];
+            if (confirm(`¿Cargar el preset "${preset.nombre}"? Se reemplazarán los materiales actuales.`)) {
+                document.getElementById('materiales-container').innerHTML = '';
+                materialesSeleccionados = [];
+                preset.datos.forEach(m => agregarMaterialConDatos(m));
+            }
+        }
+    </script>
 </body>
+
 </html>
