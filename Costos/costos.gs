@@ -31,12 +31,14 @@ const HEADERS_MATERIALES = {
     DETALLES: "Detalles",
     UNIDAD: "Unidad de Medida",
     PROVEEDOR: "Proveedor",
-    PU_USD: "P/U USD",
-    PU_ARS: "P/U ARS",
+    PU: "P/U",
+    MONEDA: "MONEDA",
     IMP: "%IMP",
     DTO: "%DTO",
     TOTAL: "Total",
     STOCK: "STOCK",
+    PRECIO_VENTA: "PRECIO VENTA",
+    MONEDA_INICIAL: "MONEDA INICIAL",
 };
 
 function getColIndex(sheet, headerName, headerRow) {
@@ -98,34 +100,177 @@ function onEdit(e) {
     if (!e?.range) return;
     const sheet = e.range.getSheet();
     if (sheet.getName() !== CONFIG.HOJA_MATERIALES) return;
+
     const fila = e.range.getRow();
-    if (fila < CONFIG.FILA_INICIO_DATOS) return;
+    if (fila < CONFIG.FILA_INICIO_DATOS_MATERIALES) return;
+
+    const col = e.range.getColumn();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const hojaCostos = ss.getSheetByName(CONFIG.HOJA_PRODUCTOS);
-    if (!hojaCostos) return;
-    const tc = parseFloat(hojaCostos.getRange("G1").getValue());
+    const hojaProd = ss.getSheetByName(CONFIG.HOJA_PRODUCTOS);
+    if (!hojaProd) return;
+
+    const tc = parseFloat(hojaProd.getRange("G1").getValue());
     if (!tc || isNaN(tc) || tc <= 0) return;
+
     const cols = getColMapSafe(
         sheet,
         HEADERS_MATERIALES,
         CONFIG.FILA_ENCABEZADOS_MATERIALES,
     );
-    const COL_USD = cols.PU_USD,
-        COL_ARS = cols.PU_ARS;
-    if (COL_USD < 1 || COL_ARS < 1) return;
-    let valE = parseFloat(sheet.getRange(fila, COL_USD).getValue()) || 0;
-    let valF = parseFloat(sheet.getRange(fila, COL_ARS).getValue()) || 0;
-    if (valE === 0 && valF === 0) return;
-    const col = e.range.getColumn();
-    if (col === COL_ARS || (valF > 0 && valE === 0)) {
-        const conv = valF / tc;
-        if (Math.abs(valE - conv) > 0.001)
-            sheet.getRange(fila, COL_USD).setValue(conv);
-    } else if (col === COL_USD || (valE > 0 && valF === 0)) {
-        const conv = valE * tc;
-        if (Math.abs(valF - conv) > 0.001)
-            sheet.getRange(fila, COL_ARS).setValue(conv);
+    const colPU = cols.PU;
+    const colMoneda = cols.MONEDA;
+
+    if (colPU < 1 || colMoneda < 1) return;
+
+    if (col !== colPU && col !== colMoneda) return;
+
+    const nombreMaterial = sheet.getRange(fila, cols.DETALLES).getValue();
+    if (!nombreMaterial) return;
+
+    if (col === colMoneda) {
+        const monedaAnterior = (e.oldValue || "").toString().trim();
+        const monedaNueva = sheet
+            .getRange(fila, colMoneda)
+            .getValue()
+            .toString()
+            .trim();
+
+        if (monedaAnterior === monedaNueva) return;
+
+        const puActual =
+            parseFloat(sheet.getRange(fila, colPU).getValue()) || 0;
+        if (puActual === 0) return;
+
+        let nuevoPU = puActual;
+        if (monedaAnterior === "AR$" && monedaNueva === "U$D") {
+            nuevoPU = puActual / tc;
+        } else if (monedaAnterior === "U$D" && monedaNueva === "AR$") {
+            nuevoPU = puActual * tc;
+        } else {
+            return;
+        }
+
+        sheet.getRange(fila, colPU).setValue(nuevoPU);
     }
+
+    const productosActualizados = recalcularProductosAfectados(
+        ss,
+        nombreMaterial,
+    );
+
+    if (productosActualizados > 0) {
+        SpreadsheetApp.getUi().alert(
+            "✅ Precios actualizados",
+            `Se recalcularon ${productosActualizados} producto(s) que usan "${nombreMaterial}".`,
+            SpreadsheetApp.getUi().ButtonSet.OK,
+        );
+    }
+}
+
+function recalcularProductosAfectados(ss, nombreMaterial) {
+    const hojaProd = ss.getSheetByName(CONFIG.HOJA_PRODUCTOS);
+    const hojaMat = ss.getSheetByName(CONFIG.HOJA_MATERIALES);
+    if (!hojaProd || !hojaMat) return 0;
+
+    const colsProd = getColMap(
+        hojaProd,
+        HEADERS_PRODUCTOS,
+        CONFIG.FILA_ENCABEZADOS_PRODUCTOS,
+    );
+    const colsMat = getColMap(
+        hojaMat,
+        HEADERS_MATERIALES,
+        CONFIG.FILA_ENCABEZADOS_MATERIALES,
+    );
+
+    const tc = parseFloat(hojaProd.getRange("G1").getValue()) || 1;
+
+    const dataMat = hojaMat.getDataRange().getValues();
+    const mapaPrecios = {};
+
+    dataMat.slice(CONFIG.FILA_INICIO_DATOS_MATERIALES - 1).forEach((r) => {
+        const nombre = r[colsMat.DETALLES - 1];
+        if (!nombre) return;
+
+        const pu = parseFloat(r[colsMat.PU - 1]) || 0;
+        const moneda = (r[colsMat.MONEDA - 1] || "").toString().trim();
+
+        let precioARS = pu;
+        if (moneda === "U$D") {
+            precioARS = pu * tc;
+        }
+
+        mapaPrecios[nombre] = precioARS;
+    });
+
+    const sheetCompras = ss.getSheetByName("Compras");
+    const coeficientes = [];
+    if (sheetCompras) {
+        const valQ4 = parseFloat(sheetCompras.getRange("Q4").getValue()) || 0;
+        const valQ5 = parseFloat(sheetCompras.getRange("Q5").getValue()) || 0;
+        coeficientes.push({ nombre: "Ninguno", valor: 0 });
+        coeficientes.push({ nombre: "Desperdicio Aluminio", valor: valQ4 });
+        coeficientes.push({ nombre: "Desperdicio Cobre", valor: valQ5 });
+    }
+
+    const dataProd = hojaProd.getDataRange().getValues();
+    let productosActualizados = 0;
+
+    dataProd.slice(CONFIG.FILA_INICIO_DATOS_PRODUCTOS - 1).forEach((row, i) => {
+        const textoMateriales = row[colsProd.MATERIALES - 1];
+        if (!textoMateriales) return;
+
+        if (!textoMateriales.toString().includes(nombreMaterial)) return;
+
+        const filaReal = i + CONFIG.FILA_INICIO_DATOS_PRODUCTOS;
+        recalcularProducto(
+            hojaProd,
+            colsProd,
+            filaReal,
+            textoMateriales.toString(),
+            mapaPrecios,
+            coeficientes,
+        );
+        productosActualizados++;
+    });
+
+    return productosActualizados;
+}
+
+function recalcularProducto(
+    hojaProd,
+    colsProd,
+    fila,
+    textoMateriales,
+    mapaPrecios,
+    coeficientes,
+) {
+    const lineas = textoMateriales.split("\n");
+    const regex =
+        /(.+?)\s*-\s*(.+?)\s*-\s*(.+?)\s*\(([\d.]+)\s*(.+?)\)(?:\s*\{W:(.+?)\})?/;
+
+    let totalCostoMat = 0;
+    let totalDesperdicio = 0;
+
+    lineas.forEach((linea) => {
+        const m = linea.match(regex);
+        if (!m) return;
+
+        const nombre = m[3].trim();
+        const cantidad = parseFloat(m[4]);
+        const coefNombre = m[6] || "Ninguno";
+        const infoCoef = coeficientes.find((c) => c.nombre === coefNombre);
+
+        const precioARS = mapaPrecios[nombre] || 0;
+        const base = precioARS * cantidad;
+        const desp = base * (infoCoef?.valor || 0);
+
+        totalCostoMat += base + desp;
+        totalDesperdicio += desp;
+    });
+
+    hojaProd.getRange(fila, colsProd.COSTO_MAT).setValue(totalCostoMat);
+    hojaProd.getRange(fila, colsProd.DESPERDICIOS).setValue(totalDesperdicio);
 }
 
 function gestionarMateriales() {
@@ -198,25 +343,34 @@ function obtenerDatosIniciales() {
         }
 
         const hojaMat = ss.getSheetByName(CONFIG.HOJA_MATERIALES);
-        // CORRECCIÓN: Usar hojaMat y HEADERS_MATERIALES
         const colsMat = getColMap(
             hojaMat,
             HEADERS_MATERIALES,
             CONFIG.FILA_ENCABEZADOS_MATERIALES,
         );
 
+        const tc = parseFloat(sheetCostos.getRange("G1").getValue()) || 1;
+
         const catalogo = hojaMat
             .getDataRange()
             .getValues()
             .slice(CONFIG.FILA_INICIO_DATOS_MATERIALES - 1)
             .filter((r) => r[colsMat.DETALLES - 1])
-            .map((r) => ({
-                categoria: r[colsMat.CATEGORIA - 1],
-                nombre: r[colsMat.DETALLES - 1],
-                unidad: r[colsMat.UNIDAD - 1],
-                proveedor: r[colsMat.PROVEEDOR - 1],
-                precio: r[colsMat.PU_ARS - 1] || 0,
-            }));
+            .map((r) => {
+                const pu = parseFloat(r[colsMat.PU - 1]) || 0;
+                const moneda = (r[colsMat.MONEDA - 1] || "").toString().trim();
+                let precioARS = pu;
+                if (moneda === "U$D") {
+                    precioARS = pu * tc;
+                }
+                return {
+                    categoria: r[colsMat.CATEGORIA - 1],
+                    nombre: r[colsMat.DETALLES - 1],
+                    unidad: r[colsMat.UNIDAD - 1],
+                    proveedor: r[colsMat.PROVEEDOR - 1],
+                    precio: precioARS,
+                };
+            });
 
         return {
             success: true,
@@ -247,25 +401,35 @@ function obtenerMaterialesDeFila(fila, listaCoef) {
         if (!texto) return { materiales: [] };
 
         const hojaMat = ss.getSheetByName(CONFIG.HOJA_MATERIALES);
-        // CORRECCIÓN: Usar hojaMat y HEADERS_MATERIALES
         const colsMat = getColMap(
             hojaMat,
             HEADERS_MATERIALES,
             CONFIG.FILA_ENCABEZADOS_MATERIALES,
         );
 
+        const tc = parseFloat(sheetCostos.getRange("G1").getValue()) || 1;
+
         const mapaPrecios = {};
         hojaMat
             .getDataRange()
             .getValues()
             .forEach((r) => {
-                if (r[colsMat.DETALLES - 1])
+                if (r[colsMat.DETALLES - 1]) {
+                    const pu = parseFloat(r[colsMat.PU - 1]) || 0;
+                    const moneda = (r[colsMat.MONEDA - 1] || "")
+                        .toString()
+                        .trim();
+                    let precioARS = pu;
+                    if (moneda === "U$D") {
+                        precioARS = pu * tc;
+                    }
                     mapaPrecios[r[colsMat.DETALLES - 1]] = {
-                        precio: r[colsMat.PU_ARS - 1],
+                        precio: precioARS,
                         cat: r[colsMat.CATEGORIA - 1],
                         prov: r[colsMat.PROVEEDOR - 1],
                         uni: r[colsMat.UNIDAD - 1],
                     };
+                }
             });
 
         const regex =
@@ -465,7 +629,10 @@ function inicializarConfiguracionIDs() {
     configurarHojaIDs();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheetConfig = ss.getSheetByName("ConfiguracionIDs");
-    sheetConfig.getRange(2, 1, sheetConfig.getLastRow(), 4).clearContent();
+    const lastRowConfig = sheetConfig.getLastRow();
+    if (lastRowConfig >= 2) {
+        sheetConfig.getRange(2, 1, lastRowConfig - 1, 4).clearContent();
+    }
 
     const hojas = ["Productos", "Materiales"];
     let nextStart = 1;
@@ -602,36 +769,85 @@ function modificarTipoCambio() {
         );
 
     hojaCostos.getRange("G1").setValue(nuevoTc);
-    // CORRECCIÓN: Usar hojaMat y HEADERS_MATERIALES
+
     const colsMat = getColMap(
         hojaMat,
         HEADERS_MATERIALES,
         CONFIG.FILA_ENCABEZADOS_MATERIALES,
     );
-    const datos = hojaMat.getDataRange().getValues();
-    const rango = hojaMat.getRange(
-        CONFIG.FILA_INICIO_DATOS_MATERIALES,
-        colsMat.PU_USD,
-        datos.length - (CONFIG.FILA_INICIO_DATOS_MATERIALES - 1),
-        2,
-    );
-    const precios = rango.getValues();
-    let cnt = 0;
-    precios.forEach((r, i) => {
-        const usd = parseFloat(r[0]) || 0,
-            ars = parseFloat(r[1]) || 0;
-        if (usd > 0) {
-            precios[i][1] = usd * nuevoTc;
-            cnt++;
-        } else if (ars > 0) {
-            precios[i][0] = ars / nuevoTc;
-            cnt++;
+    const dataMat = hojaMat.getDataRange().getValues();
+    const materialesMonedaUSD = [];
+
+    dataMat.slice(CONFIG.FILA_INICIO_DATOS_MATERIALES - 1).forEach((r) => {
+        const moneda = (r[colsMat.MONEDA - 1] || "").toString().trim();
+        if (moneda === "U$D") {
+            const nombre = r[colsMat.DETALLES - 1];
+            if (nombre) materialesMonedaUSD.push(nombre);
         }
     });
-    rango.setValues(precios);
+
+    let productosActualizados = 0;
+    if (materialesMonedaUSD.length > 0) {
+        const colsProd = getColMap(
+            hojaCostos,
+            HEADERS_PRODUCTOS,
+            CONFIG.FILA_ENCABEZADOS_PRODUCTOS,
+        );
+        const tc = nuevoTc;
+
+        const mapaPrecios = {};
+        dataMat.slice(CONFIG.FILA_INICIO_DATOS_MATERIALES - 1).forEach((r) => {
+            const nombre = r[colsMat.DETALLES - 1];
+            if (!nombre) return;
+            const pu = parseFloat(r[colsMat.PU - 1]) || 0;
+            const moneda = (r[colsMat.MONEDA - 1] || "").toString().trim();
+            let precioARS = pu;
+            if (moneda === "U$D") {
+                precioARS = pu * tc;
+            }
+            mapaPrecios[nombre] = precioARS;
+        });
+
+        const sheetCompras = ss.getSheetByName("Compras");
+        const coeficientes = [];
+        if (sheetCompras) {
+            const valQ4 =
+                parseFloat(sheetCompras.getRange("Q4").getValue()) || 0;
+            const valQ5 =
+                parseFloat(sheetCompras.getRange("Q5").getValue()) || 0;
+            coeficientes.push({ nombre: "Ninguno", valor: 0 });
+            coeficientes.push({ nombre: "Desperdicio Aluminio", valor: valQ4 });
+            coeficientes.push({ nombre: "Desperdicio Cobre", valor: valQ5 });
+        }
+
+        const dataProd = hojaCostos.getDataRange().getValues();
+        dataProd
+            .slice(CONFIG.FILA_INICIO_DATOS_PRODUCTOS - 1)
+            .forEach((row, i) => {
+                const textoMateriales = row[colsProd.MATERIALES - 1];
+                if (!textoMateriales) return;
+
+                const usaMaterialUSD = materialesMonedaUSD.some((nombre) =>
+                    textoMateriales.toString().includes(nombre),
+                );
+                if (!usaMaterialUSD) return;
+
+                const filaReal = i + CONFIG.FILA_INICIO_DATOS_PRODUCTOS;
+                recalcularProducto(
+                    hojaCostos,
+                    colsProd,
+                    filaReal,
+                    textoMateriales.toString(),
+                    mapaPrecios,
+                    coeficientes,
+                );
+                productosActualizados++;
+            });
+    }
+
     ui.alert(
         "✅ Éxito",
-        `TC → $${nuevoTc}. ${cnt} materiales recalculados.`,
+        `TC → $${nuevoTc}. ${productosActualizados} producto(s) recalculado(s).`,
         ui.ButtonSet.OK,
     );
 }
@@ -704,9 +920,7 @@ function aplicarAumentoMasivo(criterios) {
         throw new Error(
             'No se encontró la hoja "' + CONFIG.HOJA_MATERIALES + '".',
         );
-    const tc = hojaCostos
-        ? parseFloat(hojaCostos.getRange("G1").getValue()) || 1
-        : 1;
+
     const colsMat = getColMap(
         hojaMat,
         HEADERS_MATERIALES,
@@ -717,14 +931,11 @@ function aplicarAumentoMasivo(criterios) {
     const mult = 1 + porcentaje / 100;
     const numFilasDatos = datos.length - (filaInicio - 1);
     if (numFilasDatos <= 0) return { success: true, actualizados: 0 };
-    const rango = hojaMat.getRange(
-        filaInicio,
-        colsMat.PU_USD,
-        numFilasDatos,
-        2,
-    );
-    const precios = rango.getValues();
+
+    const colPU = colsMat.PU;
+    const materialesAfectados = [];
     let cnt = 0;
+
     datos.slice(filaInicio - 1).forEach((r, i) => {
         const cat =
             colsMat.CATEGORIA > 0
@@ -734,23 +945,86 @@ function aplicarAumentoMasivo(criterios) {
             colsMat.PROVEEDOR > 0
                 ? r[colsMat.PROVEEDOR - 1]?.toString().trim() || ""
                 : "";
+
         if (
             (proveedor === "TODOS" || proveedor === prov) &&
             (categoria === "TODAS" || categoria === cat)
         ) {
-            const usd = parseFloat(precios[i][0]) || 0,
-                ars = parseFloat(precios[i][1]) || 0;
-            if (usd > 0) {
-                precios[i][0] = usd * mult;
-                precios[i][1] = precios[i][0] * tc;
-            } else if (ars > 0) {
-                precios[i][1] = ars * mult;
-                precios[i][0] = precios[i][1] / tc;
+            const puActual = parseFloat(r[colPU - 1]) || 0;
+            if (puActual > 0) {
+                const nuevoPU = puActual * mult;
+                hojaMat.getRange(filaInicio + i, colPU).setValue(nuevoPU);
+                const nombre = r[colsMat.DETALLES - 1];
+                if (nombre) materialesAfectados.push(nombre);
+                cnt++;
             }
-            cnt++;
         }
     });
-    rango.setValues(precios);
-    return { success: true, actualizados: cnt };
+
+    let productosActualizados = 0;
+    if (materialesAfectados.length > 0 && hojaCostos) {
+        const colsProd = getColMap(
+            hojaCostos,
+            HEADERS_PRODUCTOS,
+            CONFIG.FILA_ENCABEZADOS_PRODUCTOS,
+        );
+        const tc = parseFloat(hojaCostos.getRange("G1").getValue()) || 1;
+
+        const mapaPrecios = {};
+        const datosMatNuevos = hojaMat.getDataRange().getValues();
+        datosMatNuevos.slice(filaInicio - 1).forEach((r) => {
+            const nombre = r[colsMat.DETALLES - 1];
+            if (!nombre) return;
+            const pu = parseFloat(r[colsMat.PU - 1]) || 0;
+            const moneda = (r[colsMat.MONEDA - 1] || "").toString().trim();
+            let precioARS = pu;
+            if (moneda === "U$D") {
+                precioARS = pu * tc;
+            }
+            mapaPrecios[nombre] = precioARS;
+        });
+
+        const sheetCompras = ss.getSheetByName("Compras");
+        const coeficientes = [];
+        if (sheetCompras) {
+            const valQ4 =
+                parseFloat(sheetCompras.getRange("Q4").getValue()) || 0;
+            const valQ5 =
+                parseFloat(sheetCompras.getRange("Q5").getValue()) || 0;
+            coeficientes.push({ nombre: "Ninguno", valor: 0 });
+            coeficientes.push({ nombre: "Desperdicio Aluminio", valor: valQ4 });
+            coeficientes.push({ nombre: "Desperdicio Cobre", valor: valQ5 });
+        }
+
+        const dataProd = hojaCostos.getDataRange().getValues();
+        dataProd
+            .slice(CONFIG.FILA_INICIO_DATOS_PRODUCTOS - 1)
+            .forEach((row, i) => {
+                const textoMateriales = row[colsProd.MATERIALES - 1];
+                if (!textoMateriales) return;
+
+                const usaMaterialAfectado = materialesAfectados.some((nombre) =>
+                    textoMateriales.toString().includes(nombre),
+                );
+                if (!usaMaterialAfectado) return;
+
+                const filaReal = i + CONFIG.FILA_INICIO_DATOS_PRODUCTOS;
+                recalcularProducto(
+                    hojaCostos,
+                    colsProd,
+                    filaReal,
+                    textoMateriales.toString(),
+                    mapaPrecios,
+                    coeficientes,
+                );
+                productosActualizados++;
+            });
+    }
+
+    return {
+        success: true,
+        actualizados: cnt,
+        productosRecalculados: productosActualizados,
+    };
 }
 

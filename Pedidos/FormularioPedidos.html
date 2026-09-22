@@ -234,7 +234,7 @@
             </div>
             <div class="col-md-6">
                 <label class="form-label">Tipo de Cambio (Ref)</label>
-                <input type="number" class="form-control bg-light" id="tc_valor" step="100" readonly>
+                <input type="number" class="form-control" id="tc_valor" step="100" onchange="guardarTipoCambio()">
             </div>
         </div>
 
@@ -242,12 +242,77 @@
         <div class="mb-4">
             <div class="section-title d-flex justify-content-between align-items-center">
                 <span>📦 Productos del Pedido</span>
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="agregarProducto()">+
-                    Agregar Producto</button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="mostrarFormNuevoProducto()">+
+                        Crear Producto</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="agregarProducto()">+ Agregar
+                        Producto</button>
+                </div>
             </div>
             <datalist id="categorias-list"></datalist>
+            <!-- Formulario para crear nuevo producto -->
+            <div id="form-nuevo-producto" class="mb-3 p-3 border rounded bg-white d-none">
+                <h6 class="mb-2">Crear Nuevo Producto en Costos</h6>
+                <div class="row g-2">
+                    <div class="col-md-5">
+                        <label class="form-label small">Categoría *</label>
+                        <input type="text" class="form-control form-control-sm" id="nueva-cat-prod"
+                            list="categorias-list" placeholder="Ej: COBRE">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label small">Modelo *</label>
+                        <input type="text" class="form-control form-control-sm" id="nuevo-modelo-prod"
+                            placeholder="Ej: Placa 3mm">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="button" class="btn btn-outline-success w-100" onclick="crearProductoNuevo()">
+                            <span id="spinnerProd" class="spinner-border spinner-border-sm d-none me-1"></span>
+                            <span id="txtBtnProd">Crear</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
             <div id="contenedor-productos">
                 <!-- Filas de productos dinámicas -->
+            </div>
+        </div>
+
+        <!-- 3b. MATERIALES -->
+        <div class="mb-4">
+            <div class="section-title d-flex justify-content-between align-items-center">
+                <span>🧱 Materiales del Pedido</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="mostrarFormNuevoMaterial()">+
+                        Crear Material</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="agregarMaterial()">+ Agregar
+                        Material</button>
+                </div>
+            </div>
+            <datalist id="categorias-mat-list"></datalist>
+            <!-- Formulario para crear nuevo material -->
+            <div id="form-nuevo-material" class="mb-3 p-3 border rounded bg-white d-none">
+                <h6 class="mb-2">Crear Nuevo Material en Costos</h6>
+                <div class="row g-2">
+                    <div class="col-md-5">
+                        <label class="form-label small">Categoría *</label>
+                        <input type="text" class="form-control form-control-sm" id="nueva-cat-mat"
+                            list="categorias-mat-list" placeholder="Ej: COBRE">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label small">Nombre/Detalles *</label>
+                        <input type="text" class="form-control form-control-sm" id="nuevo-nombre-mat"
+                            placeholder="Ej: Cable 2.5mm">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="button" class="btn btn-outline-success w-100" onclick="crearMaterialNuevo()">
+                            <span id="spinnerMat" class="spinner-border spinner-border-sm d-none me-1"></span>
+                            <span id="txtBtnMat">Crear</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="contenedor-materiales">
+                <!-- Filas de materiales dinámicas -->
             </div>
         </div>
 
@@ -391,12 +456,22 @@
                         });
                     }
 
+                    // Load Material Categories
+                    actualizarDatalistCategoriasMat();
+
                     // Add first empty product row
                     agregarProducto();
                     cambiarMonedaGeneral();
                 })
                 .withFailureHandler(err => {
-                    alert("ERROR DE PERMISOS O SISTEMA: " + err.message + "\nRecuerda ejecutar 'instalarTodoElSistema' en el editor.");
+                    const msg = (err && err.message) ? err.message : String(err);
+                    // Si es falta de acceso a Costos, mostrar solo eso (el backend
+                    // ya devuelve un mensaje claro). Si es otro error, prefijar.
+                    if (msg.indexOf("Costos") !== -1 || msg.indexOf("permiso") !== -1) {
+                        alert("⛔ " + msg);
+                    } else {
+                        alert("⚠️ Error inesperado:\n\n" + msg);
+                    }
                 })
                 .obtenerDataInicialPedidos();
         };
@@ -598,14 +673,19 @@
         }
 
         function cambiarMonedaGeneral() {
-            document.querySelectorAll('.product-row').forEach(row => {
+            document.querySelectorAll('.product-row:not(.material-row)').forEach(row => {
                 const id = row.id.split('_')[1];
                 actualizarPrecioYCalcular(id, true);
             });
+            document.querySelectorAll('.material-row').forEach(row => {
+                const id = row.id.split('_')[1];
+                actualizarPrecioMat(id);
+            });
+            calcularTotales();
         }
 
         function sincronizarPrecio(element, sourceCurrency) {
-            const row = element.closest('.product-row');
+            const row = element.closest('.product-row:not(.material-row)');
             if (!row) return;
             const tc = parseFloat(document.getElementById('tc_valor').value) || 1;
 
@@ -659,7 +739,7 @@
             let allTerminado = true;
             let hasProducts = false;
 
-            document.querySelectorAll('.product-row').forEach(row => {
+            document.querySelectorAll('.product-row:not(.material-row)').forEach(row => {
                 const id = row.id.split('_')[1];
                 const nombre = row.querySelector('.prod-name').value;
                 const qty = parseFloat(row.querySelector('.prod-qty').value) || 0;
@@ -733,20 +813,39 @@
         }
 
         function calcularTotales() {
-            // 1. Calcular Subtotal Productos (Original)
+            // 1. Calcular Subtotal Productos y Materiales
             let subtotalOriginal = 0;
             const monedaGeneral = document.querySelector('input[name="moneda"]:checked').value;
 
-            document.querySelectorAll('.product-row').forEach(row => {
-                const qty = parseFloat(row.querySelector('.prod-qty').value) || 0;
+            document.querySelectorAll('.product-row:not(.material-row)').forEach(row => {
+                const qtyInput = row.querySelector('.prod-qty');
+                if (!qtyInput) return;
+                const qty = parseFloat(qtyInput.value) || 0;
                 let price = 0;
                 if (monedaGeneral === 'USD') {
-                    price = parseFloat(row.querySelector('.prod-price-usd').value) || 0;
+                    price = parseFloat(row.querySelector('.prod-price-usd')?.value) || 0;
                 } else {
-                    price = parseFloat(row.querySelector('.prod-price-ars').value) || 0;
+                    price = parseFloat(row.querySelector('.prod-price-ars')?.value) || 0;
                 }
                 const sub = qty * price;
-                row.querySelector('.prod-sub').value = sub.toFixed(2);
+                const subInp = row.querySelector('.prod-sub');
+                if (subInp) subInp.value = sub.toFixed(2);
+                subtotalOriginal += sub;
+            });
+
+            document.querySelectorAll('.material-row').forEach(row => {
+                const qtyInput = row.querySelector('.mat-qty');
+                if (!qtyInput) return;
+                const qty = parseFloat(qtyInput.value) || 0;
+                let price = 0;
+                if (monedaGeneral === 'USD') {
+                    price = parseFloat(row.querySelector('.mat-price-usd')?.value) || 0;
+                } else {
+                    price = parseFloat(row.querySelector('.mat-price-ars')?.value) || 0;
+                }
+                const sub = qty * price;
+                const subInp = row.querySelector('.mat-sub');
+                if (subInp) subInp.value = sub.toFixed(2);
                 subtotalOriginal += sub;
             });
 
@@ -806,18 +905,20 @@
 
             // Recopilar productos
             const productos = [];
-            document.querySelectorAll('.product-row').forEach(row => {
-                const nombre = row.querySelector('.prod-name').value;
-                const cantidad = parseFloat(row.querySelector('.prod-qty').value) || 0;
-                const tipoPrecio = row.querySelector('.prod-price-type').value;
+            document.querySelectorAll('.product-row:not(.material-row)').forEach(row => {
+                const nameInp = row.querySelector('.prod-name');
+                if (!nameInp) return;
+                const nombre = nameInp.value;
+                const cantidad = parseFloat(row.querySelector('.prod-qty')?.value) || 0;
+                const tipoPrecio = row.querySelector('.prod-price-type')?.value || "PRECIO";
                 if (nombre && cantidad > 0) {
                     const catItem = CATALOGO.find(c => c.nombre === nombre);
                     let catStr = catItem ? catItem.categoria : "";
                     let modStr = catItem ? nombre.replace(catStr + " - ", "").trim() : nombre;
 
                     const monedaGeneral = document.querySelector('input[name="moneda"]:checked').value;
-                    const precioUsd = parseFloat(row.querySelector('.prod-price-usd').value) || 0;
-                    const precioArs = parseFloat(row.querySelector('.prod-price-ars').value) || 0;
+                    const precioUsd = parseFloat(row.querySelector('.prod-price-usd')?.value) || 0;
+                    const precioArs = parseFloat(row.querySelector('.prod-price-ars')?.value) || 0;
                     const precio = monedaGeneral === 'USD' ? precioUsd : precioArs;
 
                     productos.push({
@@ -833,8 +934,35 @@
                 }
             });
 
-            if (productos.length === 0) {
-                alert("Debes agregar al menos un producto.");
+            // Recopilar materiales
+            const materialesPedido = [];
+            document.querySelectorAll('.material-row').forEach(row => {
+                const matNameInp = row.querySelector('.mat-name');
+                if (!matNameInp) return;
+                const nombre = matNameInp.value;
+                const cantidad = parseFloat(row.querySelector('.mat-qty')?.value) || 0;
+                if (nombre && cantidad > 0) {
+                    const matItem = MATERIALES_CATALOGO.find(m => m.nombre === nombre);
+                    const catStr = matItem ? matItem.categoria : (row.querySelector('.mat-cat')?.value || "");
+
+                    const monedaGeneral = document.querySelector('input[name="moneda"]:checked').value;
+                    const precioUsd = parseFloat(row.querySelector('.mat-price-usd')?.value) || 0;
+                    const precioArs = parseFloat(row.querySelector('.mat-price-ars')?.value) || 0;
+                    const precio = monedaGeneral === 'USD' ? precioUsd : precioArs;
+
+                    materialesPedido.push({
+                        id: matItem ? matItem.id : '',
+                        categoria: catStr,
+                        nombre: nombre,
+                        cantidad: cantidad,
+                        precio_unitario: precio,
+                        precio_usd: precioUsd
+                    });
+                }
+            });
+
+            if (productos.length === 0 && materialesPedido.length === 0) {
+                alert("Debes agregar al menos un producto o material.");
                 btn.disabled = false; btn.innerText = "GUARDAR PEDIDO Y ACTUALIZAR STOCK";
                 return;
             }
@@ -845,6 +973,7 @@
                 moneda: document.querySelector('input[name="moneda"]:checked').value,
                 tc: parseFloat(document.getElementById('tc_valor').value) || 1,
                 productos: productos,
+                materiales: materialesPedido,
                 ...totales,
                 impuesto_pct: document.getElementById('tipo_impuesto').value === 'custom' ?
                     document.getElementById('impuesto_custom').value : document.getElementById('tipo_impuesto').value,
@@ -857,17 +986,241 @@
             google.script.run
                 .withSuccessHandler(resp => {
                     if (resp.success) {
+                        alert("✅ Pedido guardado exitosamente.");
                         google.script.host.close();
                     } else {
-                        alert("Error: " + resp.message);
+                        alert("Error al guardar pedido: " + (resp.message || "Error desconocido"));
                         btn.disabled = false; btn.innerText = "GUARDAR PEDIDO Y ACTUALIZAR STOCK";
                     }
                 })
                 .withFailureHandler(err => {
-                    alert(err.message);
+                    alert("Error de sistema al guardar: " + err.message);
                     btn.disabled = false; btn.innerText = "GUARDAR PEDIDO Y ACTUALIZAR STOCK";
                 })
                 .guardarNuevoPedido(datos);
+        }
+
+        // --- FUNCIONES DE MATERIALES ---
+        let MATERIALES_SELECCIONADOS = [];
+
+        function agregarMaterial() {
+            const id = Date.now();
+            const html = `
+      <div class="product-row row g-2 align-items-end material-row" id="mat_${id}">
+        <div class="col-md-12">
+          <label class="form-label small text-muted mb-1">Categoría</label>
+          <input type="search" class="form-control mat-cat" list="categorias-mat-list" placeholder="Filtrar cat..." onchange="filtrarMateriales('${id}')" oninput="filtrarMateriales('${id}')" onfocus="this.select()">
+        </div>
+        <div class="col-md-12">
+          <label class="form-label small text-muted mb-1">Material</label>
+          <input type="search" class="form-control mat-name" list="listmat_${id}" placeholder="Seleccionar material..." oninput="actualizarPrecioMat('${id}')" onchange="actualizarPrecioMat('${id}')" onfocus="this.select()">
+          <datalist id="listmat_${id}"></datalist>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small text-muted mb-1">Cant.</label>
+          <input type="number" class="form-control mat-qty" value="1" min="0.01" step="0.01" oninput="calcularTotalesMateriales();">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small text-muted mb-1">Precio Venta U.</label>
+          <div class="input-group input-group-sm mb-1">
+            <span class="input-group-text bg-success text-white border-success" style="width: 45px;">USD</span>
+            <input type="number" class="form-control mat-price-usd border-success" style="background-color: #d1fae5 !important;" placeholder="0.00" step="0.01" oninput="sincronizarPrecioMat(this, 'USD'); calcularTotalesMateriales();">
+          </div>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-info text-white border-info" style="width: 45px;">ARS</span>
+            <input type="number" class="form-control mat-price-ars border-info" style="background-color: #e0f2fe !important;" placeholder="0.00" step="0.01" oninput="sincronizarPrecioMat(this, 'ARS'); calcularTotalesMateriales();">
+          </div>
+        </div>
+        <div class="col-md-4 d-flex gap-2">
+          <div class="w-100">
+            <label class="form-label small text-muted mb-1">Subtotal</label>
+            <input type="text" class="form-control bg-white text-end mat-sub" readonly value="0.00">
+          </div>
+          <div class="align-self-end">
+            <button type="button" class="btn btn-outline-danger" style="height: 42px;" onclick="document.getElementById('mat_${id}').remove(); calcularTotalesMateriales();">X</button>
+          </div>
+        </div>
+      </div>
+    `;
+            document.getElementById('contenedor-materiales').insertAdjacentHTML('beforeend', html);
+            filtrarMateriales(id.toString());
+        }
+
+        function actualizarDatalistCategoriasMat() {
+            if (MATERIALES_CATALOGO && MATERIALES_CATALOGO.length > 0) {
+                const categoriasMat = [...new Set(MATERIALES_CATALOGO.map(m => m.categoria).filter(c => Boolean(c) && c !== "Sin Categoría"))];
+                const dlCatMat = document.getElementById('categorias-mat-list');
+                if (dlCatMat) {
+                    dlCatMat.innerHTML = '';
+                    categoriasMat.sort().forEach(cat => {
+                        let opt = document.createElement('option');
+                        opt.value = cat;
+                        dlCatMat.appendChild(opt);
+                    });
+                }
+            }
+        }
+
+        function filtrarMateriales(rowId) {
+            const row = document.getElementById('mat_' + rowId);
+            if (!row) return;
+            const catInput = row.querySelector('.mat-cat').value.trim().toLowerCase();
+            const dl = document.getElementById('listmat_' + rowId);
+            dl.innerHTML = '';
+
+            MATERIALES_CATALOGO.forEach(m => {
+                if (!catInput || (m.categoria && m.categoria.toLowerCase().includes(catInput))) {
+                    let opt = document.createElement('option');
+                    opt.value = m.nombre;
+                    dl.appendChild(opt);
+                }
+            });
+        }
+
+        function actualizarPrecioMat(rowId) {
+            const row = document.getElementById('mat_' + rowId);
+            if (!row) return;
+            const nombre = row.querySelector('.mat-name').value;
+            const matItem = MATERIALES_CATALOGO.find(m => m.nombre === nombre);
+            if (matItem) {
+                const inputCat = row.querySelector('.mat-cat');
+                if (matItem.categoria && (!inputCat.value || inputCat.value === 'Sin Categoría')) {
+                    inputCat.value = matItem.categoria;
+                }
+                const inputUsd = row.querySelector('.mat-price-usd');
+                const inputArs = row.querySelector('.mat-price-ars');
+                const tc = parseFloat(document.getElementById('tc_valor').value) || 1;
+
+                const precioVenta = (matItem.precioVenta !== undefined && matItem.precioVenta !== null) ? matItem.precioVenta : (matItem.precioUsd || matItem.precio || 0);
+                inputUsd.value = parseFloat(precioVenta).toFixed(2);
+                inputArs.value = (parseFloat(precioVenta) * tc).toFixed(2);
+            }
+            calcularTotalesMateriales();
+        }
+
+        function sincronizarPrecioMat(element, sourceCurrency) {
+            const row = element.closest('.material-row');
+            if (!row) return;
+            const tc = parseFloat(document.getElementById('tc_valor').value) || 1;
+            const inputUsd = row.querySelector('.mat-price-usd');
+            const inputArs = row.querySelector('.mat-price-ars');
+            let val = parseFloat(element.value) || 0;
+
+            if (sourceCurrency === 'USD') {
+                inputArs.value = (val * tc).toFixed(2);
+            } else {
+                inputUsd.value = (val / tc).toFixed(2);
+            }
+        }
+
+        function calcularTotalesMateriales() {
+            const monedaGeneral = document.querySelector('input[name="moneda"]:checked').value;
+            document.querySelectorAll('.material-row').forEach(row => {
+                const qty = parseFloat(row.querySelector('.mat-qty').value) || 0;
+                let price = 0;
+                if (monedaGeneral === 'USD') {
+                    price = parseFloat(row.querySelector('.mat-price-usd').value) || 0;
+                } else {
+                    price = parseFloat(row.querySelector('.mat-price-ars').value) || 0;
+                }
+                const sub = qty * price;
+                row.querySelector('.mat-sub').value = sub.toFixed(2);
+            });
+        }
+
+        // --- FUNCIONES DE CREACIÓN ---
+
+        function guardarTipoCambio() {
+            const tc = parseFloat(document.getElementById('tc_valor').value) || 0;
+            if (tc <= 0) {
+                alert('El Tipo de Cambio debe ser mayor a 0.');
+                return;
+            }
+            google.script.run
+                .withSuccessHandler(resp => {
+                    if (resp.success) {
+                        // TC guardado correctamente
+                    } else {
+                        alert('Error al guardar TC: ' + resp.message);
+                    }
+                })
+                .withFailureHandler(err => {
+                    alert('Error de sistema: ' + err.message);
+                })
+                .guardarTipoCambioPedidos(tc);
+        }
+
+        function mostrarFormNuevoProducto() {
+            document.getElementById('form-nuevo-producto').classList.toggle('d-none');
+        }
+
+        function crearProductoNuevo() {
+            const categoria = document.getElementById('nueva-cat-prod').value.trim();
+            const modelo = document.getElementById('nuevo-modelo-prod').value.trim();
+            if (!categoria || !modelo) { alert('Categoría y Modelo son obligatorios.'); return; }
+
+            const btn = document.getElementById('txtBtnProd');
+            const spinner = document.getElementById('spinnerProd');
+            spinner.classList.remove('d-none');
+            btn.textContent = 'Creando...';
+
+            google.script.run
+                .withSuccessHandler(resp => {
+                    spinner.classList.add('d-none');
+                    btn.textContent = 'Crear';
+                    if (resp.success) {
+                        CATALOGO.push(resp.producto);
+                        document.getElementById('nueva-cat-prod').value = '';
+                        document.getElementById('nuevo-modelo-prod').value = '';
+                        document.getElementById('form-nuevo-producto').classList.add('d-none');
+                        alert('✅ Producto creado: ' + resp.producto.nombre);
+                    } else {
+                        alert('Error: ' + resp.message);
+                    }
+                })
+                .withFailureHandler(err => {
+                    spinner.classList.add('d-none');
+                    btn.textContent = 'Crear';
+                    alert('Error de sistema: ' + err.message);
+                })
+                .agregarProductoNuevo(categoria, modelo);
+        }
+
+        function mostrarFormNuevoMaterial() {
+            document.getElementById('form-nuevo-material').classList.toggle('d-none');
+        }
+
+        function crearMaterialNuevo() {
+            const categoria = document.getElementById('nueva-cat-mat').value.trim();
+            const nombre = document.getElementById('nuevo-nombre-mat').value.trim();
+            if (!categoria || !nombre) { alert('Categoría y Nombre son obligatorios.'); return; }
+
+            const btn = document.getElementById('txtBtnMat');
+            const spinner = document.getElementById('spinnerMat');
+            spinner.classList.remove('d-none');
+            btn.textContent = 'Creando...';
+
+            google.script.run
+                .withSuccessHandler(resp => {
+                    spinner.classList.add('d-none');
+                    btn.textContent = 'Crear';
+                    if (resp.success) {
+                        MATERIALES_CATALOGO.push(resp.material);
+                        document.getElementById('nueva-cat-mat').value = '';
+                        document.getElementById('nuevo-nombre-mat').value = '';
+                        document.getElementById('form-nuevo-material').classList.add('d-none');
+                        actualizarDatalistCategoriasMat();
+                        alert('✅ Material creado: ' + resp.material.nombre);
+                    } else {
+                        alert('Error: ' + resp.message);
+                    }
+                })
+                .withFailureHandler(err => {
+                    spinner.classList.add('d-none');
+                    btn.textContent = 'Crear';
+                    alert('Error de sistema: ' + err.message);
+                })
+                .agregarMaterialNuevo(categoria, nombre);
         }
     </script>
 </body>
