@@ -247,16 +247,22 @@ function mostrarEstadoDelSistema() {
         return;
     }
 
-    if (!acceso.ok) {
+    // Sin acceso a Costos pero con triggers: listo para modo operaciones.
+    if (!acceso.ok && triggersOk) {
         lineas.push(
-            "No podés instalar los triggers hasta tener acceso al archivo de Costos.",
+            "Modo operaciones activado: podés cambiar estados y registrar entregas. " +
+                "Las funciones que tocan Costos (cargar pedido, modificar stocks) requieren acceso ejecutivo.",
         );
         ui.alert("🔧 Estado del Sistema", lineas.join("\n"), ui.ButtonSet.OK);
         return;
     }
 
-    // Tiene acceso a Costos pero le faltan triggers: ofrecer instalar ahora.
-    lineas.push("¿Querés instalar los triggers ahora para tu cuenta?");
+    // Faltan triggers: ofrecer instalar ahora (sirva o no para Costos).
+    lineas.push(
+        acceso.ok
+            ? "¿Querés instalar los triggers ahora para tu cuenta?"
+            : "Sin acceso a Costos podés usar los flujos de estado, entregas y alertas. ¿Instalás los triggers ahora?",
+    );
     const resp = ui.alert(
         "🔧 Estado del Sistema",
         lineas.join("\n"),
@@ -347,26 +353,11 @@ function usuarioTieneTriggersInstalados() {
 function instalarTodoElSistema() {
     const ui = SpreadsheetApp.getUi();
 
-    // 1) Verificar acceso al archivo de Costos ANTES de tocar triggers.
-    //    Si el usuario no tiene acceso, los triggers se crearían igual,
-    //    pero fallarían en cada ejecución: mejor avisar acá y no instalar.
+    // 1) Verificar acceso al archivo de Costos SOLO para informar.
+    //    No bloqueamos la instalación: muchos flujos (cambio de estado,
+    //    entregas parciales, alertas) NO tocan Costos y deben funcionar
+    //    igual para usuarios sin permiso a ese archivo.
     const acceso = verificarAccesoCostos();
-    if (!acceso.ok) {
-        ui.alert(
-            "⛔ No se puede instalar el sistema",
-            acceso.mensaje +
-                "\n\nUna vez que tengas acceso, volvé a ejecutar instalarTodoElSistema.",
-            ui.ButtonSet.OK,
-        );
-
-        // Marcar por ScriptProperties que esta instalación está bloqueada
-        // por permisos, así abrirModalPedidos puede dar un mensaje claro.
-        PropertiesService.getScriptProperties().setProperty(
-            "INSTALACION_BLOQUEADA_MOTIVO",
-            acceso.motivo,
-        );
-        return;
-    }
 
     // 2) Limpiar triggers anteriores y crear nuevos
     const ss = SpreadsheetApp.getActive();
@@ -379,22 +370,39 @@ function instalarTodoElSistema() {
         .onEdit()
         .create();
 
-    // 3) Guardar estado de instalación exitosa + quién la hizo
+    // 3) Guardar estado por usuario
     const props = PropertiesService.getScriptProperties();
     props.setProperty("INSTALACION_OK", "1");
     props.setProperty(
         "INSTALACION_USUARIO",
         Session.getActiveUser().getEmail() || "desconocido",
     );
-    props.deleteProperty("INSTALACION_BLOQUEADA_MOTIVO");
+    if (acceso.ok) {
+        props.deleteProperty("INSTALACION_BLOQUEADA_MOTIVO");
+    } else {
+        props.setProperty("INSTALACION_BLOQUEADA_MOTIVO", acceso.motivo);
+    }
 
-    ui.alert(
-        "🚀 ¡Sistema activado!",
-        "Triggers instalados correctamente para " +
-            (Session.getActiveUser().getEmail() || "tu cuenta") +
-            ".\n\nEl menú y los cambios de estado funcionarán automáticamente.",
-        ui.ButtonSet.OK,
-    );
+    // 4) Mensaje final según el nivel de acceso
+    const email = Session.getActiveUser().getEmail() || "tu cuenta";
+    if (acceso.ok) {
+        ui.alert(
+            "🚀 ¡Sistema activado!",
+            "Triggers instalados correctamente para " + email + ".\n\n" +
+                "Tenés acceso completo (cargar pedidos, modificar stocks, etc.).",
+            ui.ButtonSet.OK,
+        );
+    } else {
+        ui.alert(
+            "🚀 Sistema activado (modo operaciones)",
+            "Triggers instalados correctamente para " + email + ".\n\n" +
+                "Podés cambiar estados, registrar entregas y usar alertas.\n\n" +
+                "⚠️ Sin embargo, NO podés cargar pedidos ni modificar stocks " +
+                "porque tu cuenta no tiene acceso al archivo de Costos " +
+                "(restringido a ejecutivos).",
+            ui.ButtonSet.OK,
+        );
+    }
 }
 
 function onEditInstalable(e) {
@@ -2740,5 +2748,162 @@ function testGuardarPedido() {
     const res = guardarNuevoPedido(testData);
     Logger.log("Resultado: " + JSON.stringify(res));
     return res;
+}
+
+// ======================================================================
+// === WEB APP — FASE 0 (prueba de concepto) ===
+// ======================================================================
+//
+// Esta sección expone el proyecto como Web App.
+// El deploy debe hacerse con:
+//   - Execute as: ME (la cuenta propietaria de Costos)
+//   - Who has access: Only myself (Fase 0) / lista de usuarios (Fase 1+)
+//
+// Rutas soportadas (GET ?accion=...):
+//   - ping      → texto plano con el email del visitante y hora del server.
+//   - productos → JSON con los primeros N productos leídos de Costos.
+//                 Limit: parámetro opcional 'limit' (default 5, máx 50).
+//   - (vacío)   → pequeña página HTML de bienvenida con links de prueba.
+//
+// IMPORTANTE: NUNCA incluir acá datos sensibles más allá de lo necesario.
+// ======================================================================
+
+/**
+ * Entry point GET de la Web App.
+ */
+function doGet(e) {
+    const accion =
+        (e && e.parameter && e.parameter.accion ? e.parameter.accion : "")
+            .toString()
+            .trim()
+            .toLowerCase();
+
+    try {
+        if (accion === "ping") return _waPing();
+        if (accion === "productos") return _waProductos(e);
+        return _waHome();
+    } catch (err) {
+        return _waJsonError(err);
+    }
+}
+
+/** Entry point POST (aún sin handlers — reservado para Fase 1+). */
+function doPost(e) {
+    return _waJsonResponse({
+        ok: false,
+        mensaje:
+            "POST aún no implementado en Fase 0. Las acciones de escritura se habilitan en Fase 1.",
+    });
+}
+
+// --- Handlers internos ---
+
+function _waPing() {
+    const email = Session.getActiveUser().getEmail() || "(desconocido)";
+    const ahora = new Date().toISOString();
+    const acceso = verificarAccesoCostos();
+    return ContentService.createTextOutput(
+        "PING OK\n" +
+            "Usuario: " + email + "\n" +
+            "Server time: " + ahora + "\n" +
+            "Acceso a Costos (cuenta del deploy): " + acceso.ok + "\n",
+    ).setMimeType(ContentService.MimeType.TEXT);
+}
+
+function _waProductos(e) {
+    let limit = 5;
+    try {
+        const raw = e && e.parameter && e.parameter.limit;
+        const parsed = parseInt(raw, 10);
+        if (!isNaN(parsed) && parsed > 0) limit = Math.min(parsed, 50);
+    } catch (_) {}
+
+    const ssCostos = obtenerSSCostos();
+    const hojaProds = obtenerHojaProductos(ssCostos);
+    if (!hojaProds) {
+        return _waJsonResponse({
+            ok: false,
+            mensaje: "No se encontró la hoja de Productos en Costos.",
+        });
+    }
+
+    const filaHeaders = detectarFilaHeaders(hojaProds);
+    const data = hojaProds.getDataRange().getValues();
+    if (data.length < filaHeaders) {
+        return _waJsonResponse({
+            ok: false,
+            mensaje: "La hoja de Productos no tiene suficientes filas.",
+        });
+    }
+
+    const headers = data[filaHeaders - 1].map((h) =>
+        (h || "").toString().trim().toUpperCase(),
+    );
+    const idx = (name) => headers.indexOf(name);
+    const colId = idx("ID");
+    const colCat = idx("CATEGORIA");
+    const colMod = idx("MODELO");
+    const colStock = idx("STOCK");
+
+    const productos = [];
+    for (
+        let i = filaHeaders;
+        i < data.length && productos.length < limit;
+        i++
+    ) {
+        const row = data[i];
+        if (colId !== -1 && row[colId]) {
+            productos.push({
+                id: row[colId],
+                categoria: colCat !== -1 ? row[colCat] : "",
+                modelo: colMod !== -1 ? row[colMod] : "",
+                stock: colStock !== -1 ? row[colStock] : "",
+            });
+        }
+    }
+
+    return _waJsonResponse({
+        ok: true,
+        total_leidos: productos.length,
+        usuario_actual: Session.getActiveUser().getEmail() || "(anon)",
+        productos: productos,
+    });
+}
+
+function _waHome() {
+    const html =
+        "<!DOCTYPE html><html><head><meta charset='utf-8'>" +
+        "<title>Indelfrix Pedidos - Web App (Fase 0)</title>" +
+        "<style>body{font-family:Arial,sans-serif;max-width:720px;margin:40px auto;padding:0 16px;background:#0b1220;color:#e8eefc;}" +
+        "code{background:#1c2942;padding:2px 6px;border-radius:4px;color:#9ecbff;}" +
+        "a{color:#7dd3fc;}</style></head><body>" +
+        "<h1>🚀 Web App — Fase 0</h1>" +
+        "<p>Si estás viendo esto, la web app está viva y corriendo con la identidad del propietario.</p>" +
+        "<h2>Rutas de prueba</h2><ul>" +
+        "<li><code>?accion=ping</code> — verifica que responda y quién sos.</li>" +
+        "<li><code>?accion=productos</code> — lee los primeros 5 productos de Costos.</li>" +
+        "<li><code>?accion=productos&limit=20</code> — ídem, hasta 20.</li>" +
+        "</ul>" +
+        "<p><em>Solo vos podés ver esto por ahora (modo prueba).</em></p>" +
+        "</body></html>";
+    return HtmlService.createHtmlOutput(html).setTitle(
+        "Indelfrix Pedidos — Web App",
+    );
+}
+
+// --- Utilidades ---
+
+function _waJsonResponse(obj) {
+    return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
+        ContentService.MimeType.JSON,
+    );
+}
+
+function _waJsonError(err) {
+    Logger.log("Web App error: " + (err && err.stack ? err.stack : err));
+    return _waJsonResponse({
+        ok: false,
+        mensaje: "Error interno: " + (err && err.message ? err.message : err),
+    });
 }
 
